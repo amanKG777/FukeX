@@ -24,6 +24,11 @@ import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.documentfile.provider.DocumentFile
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import com.boostofstudios.fukex.data.AuthType
 import com.boostofstudios.fukex.data.Playlist
 import com.boostofstudios.fukex.data.PlaylistManager
 import com.boostofstudios.fukex.ui.theme.FukeXTheme
@@ -68,6 +73,12 @@ fun MainScreen(modifier: Modifier = Modifier) {
 	var showPinDialog by remember { mutableStateOf<Playlist?>(null) }
 	var pinInput by remember { mutableStateOf("") }
 	var showPinSetupDialog by remember { mutableStateOf<Playlist?>(null) }
+	var setupAuthType by remember { mutableStateOf(AuthType.PIN) }
+	var unlockedPlaylistIds by remember { mutableStateOf(setOf<String>()) }
+	var showConfirmUnlockDialog by remember { mutableStateOf<Playlist?>(null) }
+	var showPlaylistSelectionDialog by remember { mutableStateOf(false) }
+	var authError by remember { mutableStateOf("") }
+
 	val filePickerLauncher = rememberLauncherForActivityResult(
 		contract = ActivityResultContracts.OpenDocument()
 	) { uri: Uri? ->
@@ -179,7 +190,7 @@ fun MainScreen(modifier: Modifier = Modifier) {
 			}
 		}
 	}
-	val visiblePlaylists = playlists.filter { !it.isHidden }
+	val visiblePlaylists = playlists.filter { !it.isHidden || it.id in unlockedPlaylistIds }
 	Column(modifier = modifier.fillMaxSize()) {
 		if (isScanning) {
 			LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
@@ -224,8 +235,12 @@ fun MainScreen(modifier: Modifier = Modifier) {
 									true
 								} else false
 							},
-							CustomAccessibilityAction("Hide") {
-								showPinSetupDialog = playlist
+							CustomAccessibilityAction(if (playlist.isHidden) "Unlock" else "Hide") {
+								if (playlist.isHidden) {
+									showConfirmUnlockDialog = playlist
+								} else {
+									showPinSetupDialog = playlist
+								}
 								true
 							},
 							CustomAccessibilityAction("Export") {
@@ -246,6 +261,10 @@ fun MainScreen(modifier: Modifier = Modifier) {
 					},
 					text = {
 						Row(verticalAlignment = Alignment.CenterVertically) {
+							if (playlist.isHidden) {
+								Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(16.dp))
+								Spacer(Modifier.width(4.dp))
+							}
 							Text(playlist.name)
 							IconButton(onClick = { showPlaylistActions = playlist }) {
 								Icon(Icons.Default.MoreVert, contentDescription = "Actions for ${playlist.name}")
@@ -287,13 +306,12 @@ fun MainScreen(modifier: Modifier = Modifier) {
 							Text("Import")
 						}
 					}
-					if (playlists.any { it.isHidden }) {
+					if (playlists.any { it.isHidden && it.id !in unlockedPlaylistIds }) {
 						Spacer(modifier = Modifier.height(16.dp))
 						TextButton(onClick = { 
-							val hidden = playlists.find { it.isHidden }
-							showPinDialog = hidden
+							showPlaylistSelectionDialog = true
 						}) {
-							Text("Show Hidden Playlists")
+							Text("View Locked Playlists")
 						}
 					}
 				}
@@ -308,7 +326,22 @@ fun MainScreen(modifier: Modifier = Modifier) {
 								PlaylistManager.updatePlaylistProgress(context, currentPlaylist.id, index, pos)
 							}
 						},
-						onBack = { selectedTabIndex = 0 }
+						onBack = { selectedTabIndex = 0 },
+						onHide = {
+							if (currentPlaylist.isHidden) {
+								showConfirmUnlockDialog = currentPlaylist
+							} else {
+								showPinSetupDialog = currentPlaylist
+							}
+						},
+						onRemove = {
+							val newList = playlists.filter { it.id != currentPlaylist.id }
+							playlists = newList
+							scope.launch(Dispatchers.IO) {
+								PlaylistManager.savePlaylists(context, newList)
+							}
+							selectedTabIndex = 0
+						}
 					)
 				}
 			}
@@ -352,14 +385,25 @@ fun MainScreen(modifier: Modifier = Modifier) {
 							showPlaylistActions = null
 						}
 					)
-					ListItem(
-						headlineContent = { Text("Hide Playlist") },
-						leadingContent = { Icon(Icons.Default.Lock, null) },
-						modifier = Modifier.clickable {
-							showPinSetupDialog = playlist
-							showPlaylistActions = null
-						}
-					)
+					if (playlist.isHidden) {
+						ListItem(
+							headlineContent = { Text("Unlock Playlist") },
+							leadingContent = { Icon(Icons.Default.LockOpen, null) },
+							modifier = Modifier.clickable {
+								showConfirmUnlockDialog = playlist
+								showPlaylistActions = null
+							}
+						)
+					} else {
+						ListItem(
+							headlineContent = { Text("Hide Playlist") },
+							leadingContent = { Icon(Icons.Default.Lock, null) },
+							modifier = Modifier.clickable {
+								showPinSetupDialog = playlist
+								showPlaylistActions = null
+							}
+						)
+					}
 					ListItem(
 						headlineContent = { Text("Export Playlist") },
 						leadingContent = { Icon(Icons.Default.FileUpload, null) },
@@ -385,18 +429,60 @@ fun MainScreen(modifier: Modifier = Modifier) {
 			confirmButton = {}
 		)
 	}
-	showPinSetupDialog?.let { playlist ->
+	if (showPlaylistSelectionDialog) {
 		AlertDialog(
-			onDismissRequest = { showPinSetupDialog = null },
-			title = { Text("Set PIN to hide playlist") },
+			onDismissRequest = { showPlaylistSelectionDialog = false },
+			title = { Text("Select Playlist to View") },
 			text = {
 				Column {
-					Text("Enter a PIN to hide this playlist. Note: If you forget your PIN, the playlist cannot be recovered.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+					playlists.filter { it.isHidden && it.id !in unlockedPlaylistIds }.forEach { playlist ->
+						ListItem(
+							headlineContent = { Text(playlist.name) },
+							modifier = Modifier.clickable {
+								showPinDialog = playlist
+								showPlaylistSelectionDialog = false
+							}
+						)
+					}
+				}
+			},
+			confirmButton = {
+				TextButton(onClick = { showPlaylistSelectionDialog = false }) { Text("Cancel") }
+			}
+		)
+	}
+	showPinSetupDialog?.let { playlist ->
+		var expanded by remember { mutableStateOf(false) }
+		AlertDialog(
+			onDismissRequest = { showPinSetupDialog = null },
+			title = { Text("Set PIN/Password to hide playlist") },
+			text = {
+				Column {
+					Text("Enter a PIN or Password to hide this playlist. Note: If you forget it, the playlist cannot be recovered.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+					Spacer(Modifier.height(8.dp))
+					Box {
+						OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
+							Text("Type: ${setupAuthType.name}")
+						}
+						DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+							DropdownMenuItem(
+								text = { Text("PIN") },
+								onClick = { setupAuthType = AuthType.PIN; expanded = false }
+							)
+							DropdownMenuItem(
+								text = { Text("Password") },
+								onClick = { setupAuthType = AuthType.PASSWORD; expanded = false }
+							)
+						}
+					}
 					Spacer(Modifier.height(8.dp))
 					TextField(
 						value = pinInput,
 						onValueChange = { pinInput = it },
-						placeholder = { Text("4-6 digit PIN") },
+						placeholder = { Text(if (setupAuthType == AuthType.PIN) "4-6 digit PIN" else "Password") },
+						keyboardOptions = KeyboardOptions(
+							keyboardType = if (setupAuthType == AuthType.PIN) KeyboardType.Number else KeyboardType.Password
+						),
 						modifier = Modifier.fillMaxWidth()
 					)
 				}
@@ -405,7 +491,7 @@ fun MainScreen(modifier: Modifier = Modifier) {
 				Button(onClick = {
 					if (pinInput.length >= 4) {
 						val newList = playlists.map { 
-							if (it.id == playlist.id) it.copy(isHidden = true, pin = pinInput) else it 
+							if (it.id == playlist.id) it.copy(isHidden = true, pin = pinInput, authType = setupAuthType) else it 
 						}
 						playlists = newList
 						scope.launch(Dispatchers.IO) {
@@ -421,15 +507,77 @@ fun MainScreen(modifier: Modifier = Modifier) {
 	}
 	showPinDialog?.let { playlist ->
 		AlertDialog(
-			onDismissRequest = { showPinDialog = null },
-			title = { Text("Unlock Playlist") },
+			onDismissRequest = { 
+				showPinDialog = null
+				authError = ""
+				pinInput = ""
+			},
+			title = { Text("Unlock ${playlist.name}") },
 			text = {
-				TextField(
-					value = pinInput,
-					onValueChange = { pinInput = it },
-					placeholder = { Text("Enter PIN") },
-					modifier = Modifier.fillMaxWidth()
-				)
+				Column {
+					if (authError.isNotEmpty()) {
+						Text(authError, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+						Spacer(Modifier.height(4.dp))
+					}
+					TextField(
+						value = pinInput,
+						onValueChange = { pinInput = it; authError = "" },
+						placeholder = { Text("Enter ${playlist.authType.name}") },
+						keyboardOptions = KeyboardOptions(
+							keyboardType = if (playlist.authType == AuthType.PIN) KeyboardType.Number else KeyboardType.Password
+						),
+						modifier = Modifier.fillMaxWidth()
+					)
+				}
+			},
+			confirmButton = {
+				Button(onClick = {
+					if (pinInput == playlist.pin) {
+						val nextUnlockedIds = unlockedPlaylistIds + playlist.id
+						unlockedPlaylistIds = nextUnlockedIds
+						authError = ""
+						pinInput = ""
+						showPinDialog = null
+						
+						// Calculate target index in the next state of visiblePlaylists
+						val nextVisible = playlists.filter { !it.isHidden || it.id in nextUnlockedIds }
+						val targetIdx = nextVisible.indexOfFirst { it.id == playlist.id }
+						if (targetIdx != -1) {
+							selectedTabIndex = targetIdx + 1
+						}
+					} else {
+						authError = "Incorrect ${playlist.authType.name}"
+					}
+				}) { Text("View") }
+			}
+		)
+	}
+	showConfirmUnlockDialog?.let { playlist ->
+		AlertDialog(
+			onDismissRequest = { 
+				showConfirmUnlockDialog = null
+				authError = ""
+				pinInput = ""
+			},
+			title = { Text("Permanently Unlock ${playlist.name}") },
+			text = {
+				Column {
+					if (authError.isNotEmpty()) {
+						Text(authError, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+						Spacer(Modifier.height(4.dp))
+					}
+					Text("Enter your ${playlist.authType.name} to permanently unlock this playlist.")
+					Spacer(Modifier.height(8.dp))
+					TextField(
+						value = pinInput,
+						onValueChange = { pinInput = it; authError = "" },
+						placeholder = { Text("Enter ${playlist.authType.name}") },
+						keyboardOptions = KeyboardOptions(
+							keyboardType = if (playlist.authType == AuthType.PIN) KeyboardType.Number else KeyboardType.Password
+						),
+						modifier = Modifier.fillMaxWidth()
+					)
+				}
 			},
 			confirmButton = {
 				Button(onClick = {
@@ -438,11 +586,15 @@ fun MainScreen(modifier: Modifier = Modifier) {
 							if (it.id == playlist.id) it.copy(isHidden = false) else it 
 						}
 						playlists = newList
+						unlockedPlaylistIds = unlockedPlaylistIds - playlist.id
 						scope.launch(Dispatchers.IO) {
 							PlaylistManager.savePlaylists(context, newList)
 						}
+						authError = ""
 						pinInput = ""
-						showPinDialog = null
+						showConfirmUnlockDialog = null
+					} else {
+						authError = "Incorrect ${playlist.authType.name}"
 					}
 				}) { Text("Unlock") }
 			}
@@ -532,7 +684,9 @@ fun VLCPlayer(
 	playlist: Playlist,
 	modifier: Modifier = Modifier,
 	onProgressUpdate: (Int, Float) -> Unit,
-	onBack: () -> Unit
+	onBack: () -> Unit,
+	onHide: () -> Unit,
+	onRemove: () -> Unit
 ) {
 	val context = LocalContext.current
 	val libVLC = remember { LibVLC(context, arrayListOf("-vvv")) }
@@ -544,6 +698,30 @@ fun VLCPlayer(
 	var totalTime by remember { mutableLongStateOf(0L) }
 	var currentPFD by remember { mutableStateOf<ParcelFileDescriptor?>(null) }
 	var isInitialPlayback by remember { mutableStateOf(true) }
+	var showMoreOptions by remember { mutableStateOf(false) }
+	var showSearchDialog by remember { mutableStateOf(false) }
+	var showInfoDialog by remember { mutableStateOf(false) }
+	var searchQuery by remember { mutableStateOf("") }
+	var playlistSize by remember { mutableLongStateOf(0L) }
+
+	LaunchedEffect(showInfoDialog) {
+		if (showInfoDialog) {
+			withContext(Dispatchers.IO) {
+				var totalSize = 0L
+				playlist.uris.forEach { uri ->
+					try {
+						context.contentResolver.openAssetFileDescriptor(uri, "r")?.use {
+							totalSize += it.length
+						}
+					} catch (e: Exception) {
+						// Ignore files that can't be read
+					}
+				}
+				playlistSize = totalSize
+			}
+		}
+	}
+
 	fun playIndex(index: Int) {
 		if (index in playlist.uris.indices) {
 			val uri = playlist.uris[index]
@@ -576,26 +754,31 @@ fun VLCPlayer(
 			}
 		}
 	}
+
 	LaunchedEffect(currentIndex) {
 		playIndex(currentIndex)
 	}
+
 	LaunchedEffect(isPlaying) {
 		if (isPlaying && isInitialPlayback && playlist.lastPosition > 0f) {
 			mediaPlayer.position = playlist.lastPosition
 			isInitialPlayback = false
 		}
 	}
+
 	LaunchedEffect(currentIndex, isPlaying) {
 		while (isPlaying) {
 			kotlinx.coroutines.delay(5000)
 			onProgressUpdate(currentIndex, progress)
 		}
 	}
+
 	DisposableEffect(currentIndex) {
 		onDispose {
 			onProgressUpdate(currentIndex, progress)
 		}
 	}
+
 	DisposableEffect(Unit) {
 		val eventListener = MediaPlayer.EventListener { event ->
 			when (event.type) {
@@ -622,6 +805,7 @@ fun VLCPlayer(
 			libVLC.release()
 		}
 	}
+
 	Column(modifier = modifier) {
 		Row(
 			modifier = Modifier.fillMaxWidth().padding(8.dp),
@@ -698,15 +882,125 @@ fun VLCPlayer(
 				}, enabled = currentIndex < playlist.uris.size - 1, modifier = Modifier.semantics { contentDescription = "Next" }) {
 					Icon(Icons.Default.SkipNext, contentDescription = "Next")
 				}
+				Box {
+					IconButton(
+						onClick = { showMoreOptions = true },
+						modifier = Modifier.semantics {
+							contentDescription = "More Options"
+							customActions = listOf(
+								CustomAccessibilityAction("Search within playlist") {
+									showSearchDialog = true
+									true
+								},
+								CustomAccessibilityAction("Playlist info") {
+									showInfoDialog = true
+									true
+								},
+								CustomAccessibilityAction(if (playlist.isHidden) "Unlock" else "Hide") {
+									onHide()
+									true
+								},
+								CustomAccessibilityAction("Remove") {
+									onRemove()
+									true
+								}
+							)
+						}
+					) {
+						Icon(Icons.Default.MoreVert, contentDescription = null)
+					}
+					DropdownMenu(expanded = showMoreOptions, onDismissRequest = { showMoreOptions = false }) {
+						DropdownMenuItem(
+							text = { Text("Search within playlist") },
+							onClick = { showSearchDialog = true; showMoreOptions = false },
+							leadingIcon = { Icon(Icons.Default.Search, null) }
+						)
+						DropdownMenuItem(
+							text = { Text("Playlist info") },
+							onClick = { showInfoDialog = true; showMoreOptions = false },
+							leadingIcon = { Icon(Icons.Default.Info, null) }
+						)
+						DropdownMenuItem(
+							text = { Text(if (playlist.isHidden) "Unlock Playlist" else "Hide Playlist") },
+							onClick = { onHide(); showMoreOptions = false },
+							leadingIcon = { Icon(if (playlist.isHidden) Icons.Default.LockOpen else Icons.Default.Lock, null) }
+						)
+						DropdownMenuItem(
+							text = { Text("Remove Playlist") },
+							onClick = { onRemove(); showMoreOptions = false },
+							leadingIcon = { Icon(Icons.Default.Delete, null) }
+						)
+					}
+				}
 			}
 		}
 	}
-}
 
+	if (showSearchDialog) {
+		AlertDialog(
+			onDismissRequest = { showSearchDialog = false },
+			title = { Text("Search Track") },
+			text = {
+				Column {
+					TextField(
+						value = searchQuery,
+						onValueChange = { searchQuery = it },
+						placeholder = { Text("Track name...") },
+						modifier = Modifier.fillMaxWidth()
+					)
+					Spacer(Modifier.height(8.dp))
+					val filteredTracks = playlist.uris.mapIndexed { index, uri -> index to uri }
+						.filter { it.second.lastPathSegment?.contains(searchQuery, ignoreCase = true) == true }
+
+					LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
+						items(filteredTracks) { (index, uri) ->
+							ListItem(
+								headlineContent = { Text(uri.lastPathSegment ?: "Track ${index + 1}") },
+								modifier = Modifier.clickable {
+									currentIndex = index
+									showSearchDialog = false
+									searchQuery = ""
+								}
+							)
+						}
+					}
+				}
+			},
+			confirmButton = {
+				TextButton(onClick = { showSearchDialog = false; searchQuery = "" }) { Text("Close") }
+			}
+		)
+	}
+
+	if (showInfoDialog) {
+		AlertDialog(
+			onDismissRequest = { showInfoDialog = false },
+			title = { Text("Playlist Info") },
+			text = {
+				Column {
+					Text("Name: ${playlist.name}")
+					Text("Total Tracks: ${playlist.uris.size}")
+					Text("Total Size: ${formatSize(playlistSize)}")
+					Text("Encrypted: No")
+				}
+			},
+			confirmButton = {
+				TextButton(onClick = { showInfoDialog = false }) { Text("OK") }
+			}
+		)
+	}
+}
 
 fun formatTime(ms: Long): String {
 	val totalSeconds = ms / 1000
 	val minutes = totalSeconds / 60
 	val seconds = totalSeconds % 60
 	return "%02d:%02d".format(minutes, seconds)
+}
+
+fun formatSize(size: Long): String {
+	if (size <= 0) return "0 B"
+	val units = arrayOf("B", "KB", "MB", "GB", "TB")
+	val digitGroups = (Math.log10(size.toDouble()) / Math.log10(1024.0)).toInt()
+	return "%.2f %s".format(size / Math.pow(1024.0, digitGroups.toDouble()), units[digitGroups])
 }

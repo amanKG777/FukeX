@@ -4,13 +4,16 @@ import android.content.Context
 import android.net.Uri
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 
 object PlaylistManager {
-	private const val PREFS_NAME = "fukex_playlists"
-	private const val KEY_PLAYLISTS = "playlists"
+	private const val FILE_NAME = "playlists.json"
+
+	private fun getFile(context: Context): File {
+		return File(context.filesDir, FILE_NAME)
+	}
 
 	fun savePlaylists(context: Context, playlists: List<Playlist>) {
-		val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 		val jsonArray = JSONArray()
 		playlists.forEach { playlist ->
 			val jsonObject = JSONObject()
@@ -20,17 +23,44 @@ object PlaylistManager {
 			jsonObject.put("lastPosition", playlist.lastPosition.toDouble())
 			jsonObject.put("isHidden", playlist.isHidden)
 			jsonObject.put("pin", playlist.pin ?: "")
+			jsonObject.put("authType", playlist.authType.name)
 			val urisJson = JSONArray()
 			playlist.uris.forEach { urisJson.put(it.toString()) }
 			jsonObject.put("uris", urisJson)
 			jsonArray.put(jsonObject)
 		}
-		prefs.edit().putString(KEY_PLAYLISTS, jsonArray.toString()).apply()
+		try {
+			getFile(context).writeText(jsonArray.toString())
+		} catch (e: Exception) {
+			e.printStackTrace()
+		}
 	}
 
 	fun loadPlaylists(context: Context): List<Playlist> {
-		val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-		val jsonString = prefs.getString(KEY_PLAYLISTS, null) ?: return emptyList()
+		val file = getFile(context)
+		if (!file.exists()) {
+			// Migration from SharedPreferences if file doesn't exist yet
+			val prefs = context.getSharedPreferences("fukex_playlists", Context.MODE_PRIVATE)
+			val oldJson = prefs.getString("playlists", null)
+			if (oldJson != null) {
+				try {
+					file.writeText(oldJson)
+					prefs.edit().remove("playlists").apply()
+				} catch (e: Exception) {
+					e.printStackTrace()
+				}
+			} else {
+				return emptyList()
+			}
+		}
+
+		val jsonString = try {
+			file.readText()
+		} catch (e: Exception) {
+			e.printStackTrace()
+			return emptyList()
+		}
+
 		val playlists = mutableListOf<Playlist>()
 		try {
 			val jsonArray = JSONArray(jsonString)
@@ -42,12 +72,14 @@ object PlaylistManager {
 				val lastPosition = jsonObject.optDouble("lastPosition", 0.0).toFloat()
 				val isHidden = jsonObject.optBoolean("isHidden", false)
 				val pin = jsonObject.optString("pin", "").takeIf { it.isNotEmpty() }
+				val authTypeStr = jsonObject.optString("authType", AuthType.PIN.name)
+				val authType = try { AuthType.valueOf(authTypeStr) } catch (e: Exception) { AuthType.PIN }
 				val urisJson = jsonObject.getJSONArray("uris")
 				val uris = mutableListOf<Uri>()
 				for (j in 0 until urisJson.length()) {
 					uris.add(Uri.parse(urisJson.getString(j)))
 				}
-				playlists.add(Playlist(id, name, uris, lastIndex, lastPosition, isHidden, pin))
+				playlists.add(Playlist(id, name, uris, lastIndex, lastPosition, isHidden, pin, authType))
 			}
 		} catch (e: Exception) {
 			e.printStackTrace()
@@ -60,7 +92,6 @@ object PlaylistManager {
 		val idx = playlists.indexOfFirst { it.id == playlistId }
 		if (idx != -1) {
 			val p = playlists[idx]
-			// Only update if changed to avoid unnecessary writes
 			if (p.lastIndex != index || Math.abs(p.lastPosition - position) > 0.01f) {
 				playlists[idx] = p.copy(lastIndex = index, lastPosition = position)
 				savePlaylists(context, playlists)
