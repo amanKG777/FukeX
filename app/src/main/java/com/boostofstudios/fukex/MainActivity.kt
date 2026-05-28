@@ -20,8 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.documentfile.provider.DocumentFile
@@ -198,6 +197,46 @@ fun MainScreen(modifier: Modifier = Modifier) {
                 Tab(
                     selected = selectedTabIndex == index + 1,
                     onClick = { selectedTabIndex = index + 1 },
+                    modifier = Modifier.semantics {
+                        customActions = listOf(
+                            CustomAccessibilityAction("Move Up") {
+                                val idx = playlists.indexOf(playlist)
+                                if (idx > 0) {
+                                    val newList = playlists.toMutableList()
+                                    java.util.Collections.swap(newList, idx, idx - 1)
+                                    playlists = newList
+                                    PlaylistManager.savePlaylists(context, newList)
+                                    true
+                                } else false
+                            },
+                            CustomAccessibilityAction("Move Down") {
+                                val idx = playlists.indexOf(playlist)
+                                if (idx < playlists.size - 1) {
+                                    val newList = playlists.toMutableList()
+                                    java.util.Collections.swap(newList, idx, idx + 1)
+                                    playlists = newList
+                                    PlaylistManager.savePlaylists(context, newList)
+                                    true
+                                } else false
+                            },
+                            CustomAccessibilityAction("Hide") {
+                                showPinSetupDialog = playlist
+                                true
+                            },
+                            CustomAccessibilityAction("Export") {
+                                showPlaylistActions = playlist
+                                exportLauncher.launch("${playlist.name}.json")
+                                true
+                            },
+                            CustomAccessibilityAction("Remove") {
+                                val newList = playlists.filter { it.id != playlist.id }
+                                playlists = newList
+                                PlaylistManager.savePlaylists(context, newList)
+                                selectedTabIndex = 0
+                                true
+                            }
+                        )
+                    },
                     text = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(playlist.name)
