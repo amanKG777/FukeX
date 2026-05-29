@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,10 +38,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import org.videolan.libvlc.LibVLC
-import org.videolan.libvlc.Media
-import org.videolan.libvlc.MediaPlayer
-import org.videolan.libvlc.util.VLCVideoLayout
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
 import java.io.OutputStreamWriter
 import java.util.UUID
 
@@ -83,6 +84,14 @@ fun MainScreen(modifier: Modifier = Modifier) {
 		contract = ActivityResultContracts.OpenDocument()
 	) { uri: Uri? ->
 		uri?.let {
+			try {
+				context.contentResolver.takePersistableUriPermission(
+					it,
+					Intent.FLAG_GRANT_READ_URI_PERMISSION
+				)
+			} catch (e: Exception) {
+				e.printStackTrace()
+			}
 			val newPlaylist = Playlist(
 				id = UUID.randomUUID().toString(),
 				name = it.lastPathSegment ?: "Single File",
@@ -95,7 +104,7 @@ fun MainScreen(modifier: Modifier = Modifier) {
 					PlaylistManager.savePlaylists(context, newList)
 				}
 			}
-			selectedTabIndex = newList.size
+			selectedTabIndex = newList.count { !it.isHidden || it.id in unlockedPlaylistIds }
 		}
 	}
 	val folderPickerLauncher = rememberLauncherForActivityResult(
@@ -158,7 +167,7 @@ fun MainScreen(modifier: Modifier = Modifier) {
 						withContext(Dispatchers.IO) {
 							PlaylistManager.savePlaylists(context, newList)
 						}
-						selectedTabIndex = newList.size
+						selectedTabIndex = newList.count { !it.isHidden || it.id in unlockedPlaylistIds }
 					}
 				} catch (e: Exception) {
 					e.printStackTrace()
@@ -198,7 +207,13 @@ fun MainScreen(modifier: Modifier = Modifier) {
 		ScrollableTabRow(
 			selectedTabIndex = selectedTabIndex,
 			edgePadding = 16.dp,
-			modifier = Modifier.fillMaxWidth()
+			modifier = Modifier.fillMaxWidth(),
+			indicator = { tabPositions ->
+				val safeIndex = kotlin.math.min(selectedTabIndex, tabPositions.lastIndex)
+				if (safeIndex >= 0) {
+					TabRowDefaults.SecondaryIndicator(Modifier.tabIndicatorOffset(tabPositions[safeIndex]))
+				}
+			}
 		) {
 			Tab(
 				selected = selectedTabIndex == 0,
@@ -664,7 +679,7 @@ fun MainScreen(modifier: Modifier = Modifier) {
 							scope.launch(Dispatchers.IO) {
 								PlaylistManager.savePlaylists(context, newList)
 							}
-							selectedTabIndex = newList.size
+							selectedTabIndex = newList.count { !it.isHidden || it.id in unlockedPlaylistIds }
 							showNameDialog = false
 							playlistName = ""
 						}
@@ -693,14 +708,12 @@ fun VLCPlayer(
 	onRemove: () -> Unit
 ) {
 	val context = LocalContext.current
-	val libVLC = remember { LibVLC(context, arrayListOf("-vvv")) }
-	val mediaPlayer = remember { MediaPlayer(libVLC) }
+	val exoPlayer = remember { ExoPlayer.Builder(context).build() }
 	var currentIndex by remember { mutableIntStateOf(playlist.lastIndex) }
 	var isPlaying by remember { mutableStateOf(false) }
 	var progress by remember { mutableFloatStateOf(0f) }
 	var currentTime by remember { mutableLongStateOf(0L) }
 	var totalTime by remember { mutableLongStateOf(0L) }
-	var currentPFD by remember { mutableStateOf<ParcelFileDescriptor?>(null) }
 	var isInitialPlayback by remember { mutableStateOf(true) }
 	var showMoreOptions by remember { mutableStateOf(false) }
 	var showSearchDialog by remember { mutableStateOf(false) }
@@ -729,33 +742,10 @@ fun VLCPlayer(
 	fun playIndex(index: Int) {
 		if (index in playlist.uris.indices) {
 			val uri = playlist.uris[index]
-			try {
-				currentPFD?.close()
-				val pfd = context.contentResolver.openFileDescriptor(uri, "r")
-				if (pfd != null) {
-					currentPFD = pfd
-					val media = Media(libVLC, pfd.fileDescriptor)
-					mediaPlayer.media = media
-					media.release()
-					mediaPlayer.play()
-					currentIndex = index
-					isPlaying = true
-				} else {
-					val media = Media(libVLC, uri)
-					mediaPlayer.media = media
-					media.release()
-					mediaPlayer.play()
-					currentIndex = index
-					isPlaying = true
-				}
-			} catch (e: Exception) {
-				val media = Media(libVLC, uri)
-				mediaPlayer.media = media
-				media.release()
-				mediaPlayer.play()
-				currentIndex = index
-				isPlaying = true
-			}
+			exoPlayer.setMediaItem(MediaItem.fromUri(uri))
+			exoPlayer.prepare()
+			exoPlayer.playWhenReady = true
+			currentIndex = index
 		}
 	}
 
@@ -765,8 +755,22 @@ fun VLCPlayer(
 
 	LaunchedEffect(isPlaying) {
 		if (isPlaying && isInitialPlayback && playlist.lastPosition > 0f) {
-			mediaPlayer.position = playlist.lastPosition
+			val dur = exoPlayer.duration
+			if (dur > 0) {
+				exoPlayer.seekTo((playlist.lastPosition * dur).toLong())
+			}
 			isInitialPlayback = false
+		}
+	}
+
+	LaunchedEffect(currentIndex, isPlaying) {
+		while (isPlaying) {
+			val pos = exoPlayer.currentPosition
+			val dur = exoPlayer.duration
+			currentTime = pos
+			totalTime = if (dur > 0) dur else 0L
+			progress = if (dur > 0) pos.toFloat() / dur.toFloat() else 0f
+			kotlinx.coroutines.delay(500)
 		}
 	}
 
@@ -784,29 +788,23 @@ fun VLCPlayer(
 	}
 
 	DisposableEffect(Unit) {
-		val eventListener = MediaPlayer.EventListener { event ->
-			when (event.type) {
-				MediaPlayer.Event.PositionChanged -> progress = event.positionChanged
-				MediaPlayer.Event.TimeChanged -> currentTime = event.timeChanged
-				MediaPlayer.Event.LengthChanged -> totalTime = event.lengthChanged
-				MediaPlayer.Event.EndReached -> {
+		val listener = object : Player.Listener {
+			override fun onIsPlayingChanged(isPlayingChanged: Boolean) {
+				isPlaying = isPlayingChanged
+			}
+			override fun onPlaybackStateChanged(playbackState: Int) {
+				if (playbackState == Player.STATE_ENDED) {
 					if (currentIndex < playlist.uris.size - 1) {
 						currentIndex++
 					} else {
 						onBack()
 					}
 				}
-				MediaPlayer.Event.Playing -> isPlaying = true
-				MediaPlayer.Event.Paused -> isPlaying = false
-				MediaPlayer.Event.Stopped -> isPlaying = false
 			}
 		}
-		mediaPlayer.setEventListener(eventListener)
+		exoPlayer.addListener(listener)
 		onDispose {
-			mediaPlayer.stop()
-			mediaPlayer.release()
-			currentPFD?.close()
-			libVLC.release()
+			exoPlayer.release()
 		}
 	}
 
@@ -828,12 +826,13 @@ fun VLCPlayer(
 		}
 		AndroidView(
 			factory = { ctx ->
-				VLCVideoLayout(ctx).apply {
+				PlayerView(ctx).apply {
+					player = exoPlayer
+					useController = false
 					layoutParams = ViewGroup.LayoutParams(
 						ViewGroup.LayoutParams.MATCH_PARENT,
 						ViewGroup.LayoutParams.MATCH_PARENT
 					)
-					mediaPlayer.attachViews(this, null, true, false)
 				}
 			},
 			modifier = Modifier.weight(1f)
@@ -843,7 +842,8 @@ fun VLCPlayer(
 				value = progress,
 				onValueChange = { 
 					progress = it
-					mediaPlayer.position = it
+					val newPos = (it * exoPlayer.duration).toLong()
+					if (newPos >= 0) exoPlayer.seekTo(newPos)
 				},
 				modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Seek" }
 			)
@@ -863,20 +863,21 @@ fun VLCPlayer(
 					Icon(Icons.Default.SkipPrevious, contentDescription = "Previous")
 				}
 				IconButton(onClick = {
-					val newTime = (mediaPlayer.time - 10000).coerceAtLeast(0)
-					mediaPlayer.time = newTime
+					val newTime = (exoPlayer.currentPosition - 10000).coerceAtLeast(0)
+					exoPlayer.seekTo(newTime)
 				}) {
 					Icon(Icons.Default.FastRewind, contentDescription = "Rewind")
 				}
-				IconButton(onClick = { if (isPlaying) mediaPlayer.pause() else mediaPlayer.play() }) {
+				IconButton(onClick = { if (isPlaying) exoPlayer.pause() else exoPlayer.play() }) {
 					Icon(
 						if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, 
 						contentDescription = if (isPlaying) "Pause" else "Play"
 					)
 				}
 				IconButton(onClick = {
-					val newTime = (mediaPlayer.time + 10000).coerceAtMost(totalTime)
-					mediaPlayer.time = newTime
+					val dur = exoPlayer.duration
+					val newTime = (exoPlayer.currentPosition + 10000).coerceAtMost(if (dur > 0) dur else 0)
+					exoPlayer.seekTo(newTime)
 				}) {
 					Icon(Icons.Default.FastForward, contentDescription = "Forward")
 				}
