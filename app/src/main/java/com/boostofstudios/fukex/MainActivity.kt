@@ -14,6 +14,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
@@ -63,12 +64,14 @@ class MainActivity : ComponentActivity() {
 fun MainScreen(modifier: Modifier = Modifier) {
 	val context = LocalContext.current
 	val scope = rememberCoroutineScope()
-	var playlists by remember { mutableStateOf(PlaylistManager.loadPlaylists(context)) }
+	var playlists by remember { 
+		mutableStateOf(PlaylistManager.loadPlaylists(context).let {
+			if (it.isEmpty()) listOf(Playlist(UUID.randomUUID().toString(), "Default Playlist", emptyList())) else it
+		})
+	}
 	var selectedTabIndex by remember { mutableIntStateOf(0) }
-	var showOptionsDialog by remember { mutableStateOf(false) }
 	var showNameDialog by remember { mutableStateOf(false) }
 	var playlistName by remember { mutableStateOf("") }
-	var tempPlaylistUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
 	var isScanning by remember { mutableStateOf(false) }
 	var showPlaylistActions by remember { mutableStateOf<Playlist?>(null) }
 	var showPinDialog by remember { mutableStateOf<Playlist?>(null) }
@@ -79,67 +82,40 @@ fun MainScreen(modifier: Modifier = Modifier) {
 	var showConfirmUnlockDialog by remember { mutableStateOf<Playlist?>(null) }
 	var showPlaylistSelectionDialog by remember { mutableStateOf(false) }
 	var authError by remember { mutableStateOf("") }
+	var showFilePicker by remember { mutableStateOf(false) }
 
-	val filePickerLauncher = rememberLauncherForActivityResult(
-		contract = ActivityResultContracts.OpenDocument()
-	) { uri: Uri? ->
-		uri?.let {
-			try {
-				context.contentResolver.takePersistableUriPermission(
-					it,
-					Intent.FLAG_GRANT_READ_URI_PERMISSION
-				)
-			} catch (e: Exception) {
-				e.printStackTrace()
+	LaunchedEffect(Unit) {
+		if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+			if (!android.os.Environment.isExternalStorageManager()) {
+				val intent = Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
+				intent.data = Uri.parse("package:${context.packageName}")
+				context.startActivity(intent)
 			}
-			val newPlaylist = Playlist(
-				id = UUID.randomUUID().toString(),
-				name = it.lastPathSegment ?: "Single File",
-				uris = listOf(it)
-			)
-			val newList = playlists + newPlaylist
-			playlists = newList
-			scope.launch {
-				withContext(Dispatchers.IO) {
-					PlaylistManager.savePlaylists(context, newList)
-				}
-			}
-			selectedTabIndex = newList.count { !it.isHidden || it.id in unlockedPlaylistIds }
 		}
 	}
-	val folderPickerLauncher = rememberLauncherForActivityResult(
-		contract = ActivityResultContracts.OpenDocumentTree()
-	) { uri: Uri? ->
-		uri?.let { treeUri ->
-			scope.launch {
-				isScanning = true
-				withContext(Dispatchers.IO) {
-					try {
-						context.contentResolver.takePersistableUriPermission(
-							treeUri,
-							Intent.FLAG_GRANT_READ_URI_PERMISSION
-						)
-						val documentFile = DocumentFile.fromTreeUri(context, treeUri)
-						val mediaExtensions = setOf("mp3", "m4a", "wav", "flac", "ogg", "mp4", "mkv", "avi", "mov", "wmv", "webm")
-						val files = documentFile?.listFiles()?.filter { file ->
-							val extension = file.name?.substringAfterLast('.', "")?.lowercase()
-							file.isFile && (
-								file.type?.startsWith("video/") == true || 
-								file.type?.startsWith("audio/") == true || 
-								mediaExtensions.contains(extension)
-							)
-						}?.sortedBy { it.name }?.map { it.uri } ?: emptyList()
-						tempPlaylistUris = files
-					} catch (e: Exception) {
-						e.printStackTrace()
+
+	val visiblePlaylists = playlists.filter { !it.isHidden || it.id in unlockedPlaylistIds }
+
+	if (showFilePicker) {
+		FilePickerScreen(
+			onFilesSelected = { uris ->
+				showFilePicker = false
+				if (uris.isNotEmpty() && visiblePlaylists.isNotEmpty()) {
+					val safeIndex = kotlin.math.min(selectedTabIndex, visiblePlaylists.lastIndex)
+					if (safeIndex >= 0) {
+						val currentPlaylist = visiblePlaylists[safeIndex]
+						val updatedPlaylist = currentPlaylist.copy(uris = currentPlaylist.uris + uris)
+						val newList = playlists.map { if (it.id == currentPlaylist.id) updatedPlaylist else it }
+						playlists = newList
+						scope.launch(Dispatchers.IO) {
+							PlaylistManager.savePlaylists(context, newList)
+						}
 					}
 				}
-				isScanning = false
-				if (tempPlaylistUris.isNotEmpty()) {
-					showNameDialog = true
-				}
-			}
-		}
+			},
+			onCancel = { showFilePicker = false }
+		)
+		return
 	}
 	val importLauncher = rememberLauncherForActivityResult(
 		contract = ActivityResultContracts.OpenDocument()
@@ -199,8 +175,31 @@ fun MainScreen(modifier: Modifier = Modifier) {
 			}
 		}
 	}
-	val visiblePlaylists = playlists.filter { !it.isHidden || it.id in unlockedPlaylistIds }
-	Column(modifier = modifier.fillMaxSize()) {
+	Scaffold(
+		modifier = Modifier.semantics { isTraversalGroup = true },
+		topBar = {
+			@OptIn(ExperimentalMaterial3Api::class)
+			TopAppBar(
+				title = { Text("FukeX", modifier = Modifier.semantics { heading() }) },
+				actions = {
+					IconButton(onClick = { importLauncher.launch(arrayOf("application/json")) }) {
+						Icon(Icons.Default.FileDownload, contentDescription = "Import Playlist")
+					}
+					if (playlists.any { it.isHidden && it.id !in unlockedPlaylistIds }) {
+						IconButton(onClick = { showPlaylistSelectionDialog = true }) {
+							Icon(Icons.Default.Lock, contentDescription = "View Locked Playlists")
+						}
+					}
+				}
+			)
+		},
+		floatingActionButton = {
+			FloatingActionButton(onClick = { showFilePicker = true }) {
+				Icon(Icons.Default.Add, contentDescription = "Add Media to Playlist")
+			}
+		}
+	) { scaffoldPadding ->
+		Column(modifier = modifier.fillMaxSize().padding(scaffoldPadding).semantics { traversalIndex = -1f }) {
 		if (isScanning) {
 			LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
 		}
@@ -215,64 +214,80 @@ fun MainScreen(modifier: Modifier = Modifier) {
 				}
 			}
 		) {
-			Tab(
-				selected = selectedTabIndex == 0,
-				onClick = { selectedTabIndex = 0 },
-				text = { Text("Home") }
-			)
 			visiblePlaylists.forEachIndexed { index, playlist ->
 				Tab(
-					selected = selectedTabIndex == index + 1,
-					onClick = { selectedTabIndex = index + 1 },
+					selected = selectedTabIndex == index,
+					onClick = { selectedTabIndex = index },
 					modifier = Modifier.semantics {
-						customActions = listOf(
-							CustomAccessibilityAction("Move Up") {
-								val idx = playlists.indexOf(playlist)
-								if (idx > 0) {
-									val newList = playlists.toMutableList()
-									java.util.Collections.swap(newList, idx, idx - 1)
-									playlists = newList
-									scope.launch(Dispatchers.IO) {
-										PlaylistManager.savePlaylists(context, newList)
-									}
-									true
-								} else false
-							},
-							CustomAccessibilityAction("Move Down") {
-								val idx = playlists.indexOf(playlist)
-								if (idx < playlists.size - 1) {
-									val newList = playlists.toMutableList()
-									java.util.Collections.swap(newList, idx, idx + 1)
-									playlists = newList
-									scope.launch(Dispatchers.IO) {
-										PlaylistManager.savePlaylists(context, newList)
-									}
-									true
-								} else false
-							},
-							CustomAccessibilityAction(if (playlist.isHidden) "Unlock" else "Hide") {
-								if (playlist.isHidden) {
-									showConfirmUnlockDialog = playlist
-								} else {
-									showPinSetupDialog = playlist
-								}
+						val actions = mutableListOf(
+							CustomAccessibilityAction("Create new playlist") {
+								showNameDialog = true
 								true
-							},
+							}
+						)
+						if (playlists.size > 1) {
+							actions.add(
+								CustomAccessibilityAction("Move Left") {
+									val idx = playlists.indexOf(playlist)
+									if (idx > 0) {
+										val newList = playlists.toMutableList()
+										java.util.Collections.swap(newList, idx, idx - 1)
+										playlists = newList
+										scope.launch(Dispatchers.IO) {
+											PlaylistManager.savePlaylists(context, newList)
+										}
+										true
+									} else false
+								}
+							)
+							actions.add(
+								CustomAccessibilityAction("Move Right") {
+									val idx = playlists.indexOf(playlist)
+									if (idx < playlists.size - 1) {
+										val newList = playlists.toMutableList()
+										java.util.Collections.swap(newList, idx, idx + 1)
+										playlists = newList
+										scope.launch(Dispatchers.IO) {
+											PlaylistManager.savePlaylists(context, newList)
+										}
+										true
+									} else false
+								}
+							)
+						}
+						if (playlists.size > 1) {
+							actions.add(
+								CustomAccessibilityAction(if (playlist.isHidden) "Unlock" else "Hide") {
+									if (playlist.isHidden) {
+										showConfirmUnlockDialog = playlist
+									} else {
+										showPinSetupDialog = playlist
+									}
+									true
+								}
+							)
+						}
+						actions.add(
 							CustomAccessibilityAction("Export") {
 								showPlaylistActions = playlist
 								exportLauncher.launch("${playlist.name}.json")
 								true
-							},
-							CustomAccessibilityAction("Remove") {
-								val newList = playlists.filter { it.id != playlist.id }
-								playlists = newList
-								scope.launch(Dispatchers.IO) {
-									PlaylistManager.savePlaylists(context, newList)
-								}
-								selectedTabIndex = 0
-								true
 							}
 						)
+						if (playlists.size > 1) {
+							actions.add(
+								CustomAccessibilityAction("Remove") {
+									val newList = playlists.filter { it.id != playlist.id }
+									playlists = newList
+									scope.launch(Dispatchers.IO) {
+										PlaylistManager.savePlaylists(context, newList)
+									}
+									selectedTabIndex = 0
+									true
+								}
+							)
+						}
+						customActions = actions
 					},
 					text = {
 						Row(verticalAlignment = Alignment.CenterVertically) {
@@ -292,53 +307,19 @@ fun MainScreen(modifier: Modifier = Modifier) {
 				)
 			}
 		}
-		Box(modifier = Modifier.weight(1f)) {
-			if (selectedTabIndex == 0) {
-				Column(
-					modifier = Modifier.fillMaxSize().padding(16.dp),
-					horizontalAlignment = Alignment.CenterHorizontally,
-					verticalArrangement = Arrangement.Center
-				) {
-					Text(
-						text = "FukeX",
-						style = MaterialTheme.typography.headlineLarge,
-						modifier = Modifier.semantics { contentDescription = "FukeX" }
-					)
-					Spacer(modifier = Modifier.height(32.dp))
-					Row {
-						Button(onClick = { showOptionsDialog = true }) {
-							Icon(Icons.Default.PlayArrow, contentDescription = null)
-							Spacer(Modifier.width(8.dp))
-							Text("Play")
-						}
-						Spacer(Modifier.width(16.dp))
-						Button(onClick = { importLauncher.launch(arrayOf("application/json")) }) {
-							Icon(Icons.Default.FileDownload, contentDescription = null)
-							Spacer(Modifier.width(8.dp))
-							Text("Import Playlist")
-						}
-					}
-					if (playlists.any { it.isHidden && it.id !in unlockedPlaylistIds }) {
-						Spacer(modifier = Modifier.height(16.dp))
-						TextButton(onClick = { 
-							showPlaylistSelectionDialog = true
-						}) {
-							Text("View Locked Playlists")
-						}
-					}
-				}
-			} else if (selectedTabIndex <= visiblePlaylists.size) {
-				val currentPlaylist = visiblePlaylists[selectedTabIndex - 1]
+Box(modifier = Modifier.weight(1f)) {
+			if (selectedTabIndex < visiblePlaylists.size) {
+				val currentPlaylist = visiblePlaylists[selectedTabIndex]
 				key(currentPlaylist.id) {
-					VLCPlayer(
+					AudioPlayerView(
 						playlist = currentPlaylist,
 						modifier = Modifier.fillMaxSize(),
+						canModifyPlaylist = playlists.size > 1,
 						onProgressUpdate = { index, pos ->
 							scope.launch(Dispatchers.IO) {
 								PlaylistManager.updatePlaylistProgress(context, currentPlaylist.id, index, pos)
 							}
 						},
-						onBack = { selectedTabIndex = 0 },
 						onHide = {
 							if (currentPlaylist.isHidden) {
 								showConfirmUnlockDialog = currentPlaylist
@@ -353,11 +334,19 @@ fun MainScreen(modifier: Modifier = Modifier) {
 								PlaylistManager.savePlaylists(context, newList)
 							}
 							selectedTabIndex = 0
+						},
+						onUpdatePlaylist = { updatedPlaylist ->
+							val newList = playlists.map { if (it.id == updatedPlaylist.id) updatedPlaylist else it }
+							playlists = newList
+							scope.launch(Dispatchers.IO) {
+								PlaylistManager.savePlaylists(context, newList)
+							}
 						}
 					)
 				}
 			}
 		}
+	}
 	}
 	showPlaylistActions?.let { playlist ->
 		AlertDialog(
@@ -366,56 +355,58 @@ fun MainScreen(modifier: Modifier = Modifier) {
 			title = { Text("Actions: ${playlist.name}") },
 			text = {
 				Column {
-					ListItem(
-						headlineContent = { Text("Move Up") },
-						leadingContent = { Icon(Icons.Default.ArrowUpward, null) },
-						modifier = Modifier.clickable {
-							val idx = playlists.indexOf(playlist)
-							if (idx > 0) {
-								val newList = playlists.toMutableList()
-								java.util.Collections.swap(newList, idx, idx - 1)
-								playlists = newList
-								scope.launch(Dispatchers.IO) {
-									PlaylistManager.savePlaylists(context, newList)
-								}
-							}
-							showPlaylistActions = null
-						}
-					)
-					ListItem(
-						headlineContent = { Text("Move Down") },
-						leadingContent = { Icon(Icons.Default.ArrowDownward, null) },
-						modifier = Modifier.clickable {
-							val idx = playlists.indexOf(playlist)
-							if (idx < playlists.size - 1) {
-								val newList = playlists.toMutableList()
-								java.util.Collections.swap(newList, idx, idx + 1)
-								playlists = newList
-								scope.launch(Dispatchers.IO) {
-									PlaylistManager.savePlaylists(context, newList)
-								}
-							}
-							showPlaylistActions = null
-						}
-					)
-					if (playlist.isHidden) {
+					if (playlists.size > 1) {
 						ListItem(
-							headlineContent = { Text("Unlock Playlist") },
-							leadingContent = { Icon(Icons.Default.LockOpen, null) },
+							headlineContent = { Text("Move Left") },
+							leadingContent = { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) },
 							modifier = Modifier.clickable {
-								showConfirmUnlockDialog = playlist
+								val idx = playlists.indexOf(playlist)
+								if (idx > 0) {
+									val newList = playlists.toMutableList()
+									java.util.Collections.swap(newList, idx, idx - 1)
+									playlists = newList
+									scope.launch(Dispatchers.IO) {
+										PlaylistManager.savePlaylists(context, newList)
+									}
+								}
 								showPlaylistActions = null
 							}
 						)
-					} else {
 						ListItem(
-							headlineContent = { Text("Hide Playlist") },
-							leadingContent = { Icon(Icons.Default.Lock, null) },
+							headlineContent = { Text("Move Right") },
+							leadingContent = { Icon(Icons.AutoMirrored.Filled.ArrowForward, null) },
 							modifier = Modifier.clickable {
-								showPinSetupDialog = playlist
+								val idx = playlists.indexOf(playlist)
+								if (idx < playlists.size - 1) {
+									val newList = playlists.toMutableList()
+									java.util.Collections.swap(newList, idx, idx + 1)
+									playlists = newList
+									scope.launch(Dispatchers.IO) {
+										PlaylistManager.savePlaylists(context, newList)
+									}
+								}
 								showPlaylistActions = null
 							}
 						)
+						if (playlist.isHidden) {
+							ListItem(
+								headlineContent = { Text("Unlock Playlist") },
+								leadingContent = { Icon(Icons.Default.LockOpen, null) },
+								modifier = Modifier.clickable {
+									showConfirmUnlockDialog = playlist
+									showPlaylistActions = null
+								}
+							)
+						} else {
+							ListItem(
+								headlineContent = { Text("Hide Playlist") },
+								leadingContent = { Icon(Icons.Default.Lock, null) },
+								modifier = Modifier.clickable {
+									showPinSetupDialog = playlist
+									showPlaylistActions = null
+								}
+							)
+						}
 					}
 					ListItem(
 						headlineContent = { Text("Export Playlist") },
@@ -424,19 +415,21 @@ fun MainScreen(modifier: Modifier = Modifier) {
 							exportLauncher.launch("${playlist.name}.json")
 						}
 					)
-					ListItem(
-						headlineContent = { Text("Remove") },
-						leadingContent = { Icon(Icons.Default.Delete, null) },
-						modifier = Modifier.clickable {
-							val newList = playlists.filter { it.id != playlist.id }
-							playlists = newList
-							scope.launch(Dispatchers.IO) {
-								PlaylistManager.savePlaylists(context, newList)
+					if (playlists.size > 1) {
+						ListItem(
+							headlineContent = { Text("Remove") },
+							leadingContent = { Icon(Icons.Default.Delete, null) },
+							modifier = Modifier.clickable {
+								val newList = playlists.filter { it.id != playlist.id }
+								playlists = newList
+								scope.launch(Dispatchers.IO) {
+									PlaylistManager.savePlaylists(context, newList)
+								}
+								selectedTabIndex = 0
+								showPlaylistActions = null
 							}
-							selectedTabIndex = 0
-							showPlaylistActions = null
-						}
-					)
+						)
+					}
 				}
 			},
 			confirmButton = {}
@@ -617,40 +610,7 @@ fun MainScreen(modifier: Modifier = Modifier) {
 			}
 		)
 	}
-	if (showOptionsDialog) {
-		AlertDialog(
-			modifier = Modifier.semantics { paneTitle = "Select what you would like to play" },
-			onDismissRequest = { showOptionsDialog = false },
-			title = { Text("Select what you would like to play") },
-			text = {
-				Column {
-					Button(
-						onClick = {
-							showOptionsDialog = false
-							folderPickerLauncher.launch(null)
-						},
-						modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-					) {
-						Text("Playlist (Folder)")
-					}
-					Button(
-						onClick = {
-							showOptionsDialog = false
-							filePickerLauncher.launch(arrayOf("*/*"))
-						},
-						modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-					) {
-						Text("File")
-					}
-				}
-			},
-			confirmButton = {
-				TextButton(onClick = { showOptionsDialog = false }) {
-					Text("Cancel")
-				}
-			}
-		)
-	}
+
 	if (showNameDialog) {
 		AlertDialog(
 			modifier = Modifier.semantics { paneTitle = "Name your playlist" },
@@ -672,14 +632,17 @@ fun MainScreen(modifier: Modifier = Modifier) {
 							val newPlaylist = Playlist(
 								id = UUID.randomUUID().toString(),
 								name = playlistName,
-								uris = tempPlaylistUris
+								uris = emptyList()
 							)
 							val newList = playlists + newPlaylist
 							playlists = newList
 							scope.launch(Dispatchers.IO) {
 								PlaylistManager.savePlaylists(context, newList)
 							}
-							selectedTabIndex = newList.count { !it.isHidden || it.id in unlockedPlaylistIds }
+							val nextVisibleIndex = newList.count { !it.isHidden || it.id in unlockedPlaylistIds } - 1
+							if (nextVisibleIndex >= 0) {
+								selectedTabIndex = nextVisibleIndex
+							}
 							showNameDialog = false
 							playlistName = ""
 						}
@@ -699,13 +662,14 @@ fun MainScreen(modifier: Modifier = Modifier) {
 
 
 @Composable
-fun VLCPlayer(
+fun AudioPlayerView(
 	playlist: Playlist,
 	modifier: Modifier = Modifier,
+	canModifyPlaylist: Boolean,
 	onProgressUpdate: (Int, Float) -> Unit,
-	onBack: () -> Unit,
 	onHide: () -> Unit,
-	onRemove: () -> Unit
+	onRemove: () -> Unit,
+	onUpdatePlaylist: (Playlist) -> Unit
 ) {
 	val context = LocalContext.current
 	val exoPlayer = remember { ExoPlayer.Builder(context).build() }
@@ -739,18 +703,20 @@ fun VLCPlayer(
 		}
 	}
 
-	fun playIndex(index: Int) {
+	fun playIndex(index: Int, play: Boolean = true) {
 		if (index in playlist.uris.indices) {
 			val uri = playlist.uris[index]
 			exoPlayer.setMediaItem(MediaItem.fromUri(uri))
 			exoPlayer.prepare()
-			exoPlayer.playWhenReady = true
+			if (play) exoPlayer.playWhenReady = true
 			currentIndex = index
 		}
 	}
 
-	LaunchedEffect(currentIndex) {
-		playIndex(currentIndex)
+	LaunchedEffect(playlist.uris.size) {
+		if (playlist.uris.isNotEmpty() && exoPlayer.currentMediaItem == null) {
+			playIndex(currentIndex, play = false)
+		}
 	}
 
 	LaunchedEffect(isPlaying) {
@@ -796,8 +762,7 @@ fun VLCPlayer(
 				if (playbackState == Player.STATE_ENDED) {
 					if (currentIndex < playlist.uris.size - 1) {
 						currentIndex++
-					} else {
-						onBack()
+						playIndex(currentIndex)
 					}
 				}
 			}
@@ -809,132 +774,178 @@ fun VLCPlayer(
 	}
 
 	Column(modifier = modifier) {
-		Row(
-			modifier = Modifier.fillMaxWidth().padding(8.dp),
-			verticalAlignment = Alignment.CenterVertically
-		) {
-			IconButton(onClick = onBack) {
-				Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-			}
-			Column(modifier = Modifier.weight(1f).padding(start = 8.dp)) {
-				Text("Now Playing: ${playlist.name}", style = MaterialTheme.typography.labelSmall)
-				Text(
-					text = "Track ${currentIndex + 1} of ${playlist.uris.size}",
-					style = MaterialTheme.typography.bodyMedium
+		LazyColumn(modifier = Modifier.weight(1f)) {
+			items(playlist.uris.size) { index ->
+				val uri = playlist.uris[index]
+				val isSelected = index == currentIndex
+				ListItem(
+					headlineContent = {
+						Text(
+							uri.lastPathSegment ?: "Track ${index + 1}",
+							color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+						)
+					},
+					leadingContent = {
+						if (isSelected) {
+							Icon(Icons.Default.PlayArrow, contentDescription = "Playing", tint = MaterialTheme.colorScheme.primary)
+						} else {
+							Icon(Icons.Default.AudioFile, contentDescription = null)
+						}
+					},
+					modifier = Modifier
+						.clickable {
+							playIndex(index)
+						}
+						.semantics {
+							val actions = mutableListOf<CustomAccessibilityAction>()
+							if (index > 0) {
+								actions.add(CustomAccessibilityAction("Move Up") {
+									val newUris = playlist.uris.toMutableList()
+									java.util.Collections.swap(newUris, index, index - 1)
+									onUpdatePlaylist(playlist.copy(uris = newUris))
+									if (currentIndex == index) currentIndex = index - 1
+									else if (currentIndex == index - 1) currentIndex = index
+									true
+								})
+							}
+							if (index < playlist.uris.size - 1) {
+								actions.add(CustomAccessibilityAction("Move Down") {
+									val newUris = playlist.uris.toMutableList()
+									java.util.Collections.swap(newUris, index, index + 1)
+									onUpdatePlaylist(playlist.copy(uris = newUris))
+									if (currentIndex == index) currentIndex = index + 1
+									else if (currentIndex == index + 1) currentIndex = index
+									true
+								})
+							}
+							actions.add(CustomAccessibilityAction("Remove") {
+								val newUris = playlist.uris.toMutableList()
+								newUris.removeAt(index)
+								onUpdatePlaylist(playlist.copy(uris = newUris))
+								if (currentIndex == index) {
+									if (newUris.isEmpty()) {
+										exoPlayer.stop()
+										exoPlayer.clearMediaItems()
+										currentIndex = -1
+									} else {
+										val nextIndex = if (index < newUris.size) index else newUris.lastIndex
+										playIndex(nextIndex)
+									}
+								} else if (currentIndex > index) {
+									currentIndex--
+								}
+								true
+							})
+							customActions = actions
+						}
 				)
 			}
 		}
-		AndroidView(
-			factory = { ctx ->
-				PlayerView(ctx).apply {
-					player = exoPlayer
-					useController = false
-					layoutParams = ViewGroup.LayoutParams(
-						ViewGroup.LayoutParams.MATCH_PARENT,
-						ViewGroup.LayoutParams.MATCH_PARENT
-					)
-				}
-			},
-			modifier = Modifier.weight(1f)
-		)
-		Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-			Slider(
-				value = progress,
-				onValueChange = { 
-					progress = it
-					val newPos = (it * exoPlayer.duration).toLong()
-					if (newPos >= 0) exoPlayer.seekTo(newPos)
-				},
-				modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Seek" }
-			)
-			Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-				Text(formatTime(currentTime))
-				Text(formatTime(totalTime))
-			}
-			Row(
-				modifier = Modifier.fillMaxWidth(),
-				horizontalArrangement = Arrangement.SpaceEvenly,
-				verticalAlignment = Alignment.CenterVertically
-			) {
-				IconButton(
-					onClick = { if (currentIndex > 0) currentIndex-- },
-					enabled = currentIndex > 0
+
+		Surface(shadowElevation = 8.dp) {
+			Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+				Text(
+					text = "Now Playing: ${playlist.name} - Track ${currentIndex + 1} of ${playlist.uris.size}",
+					style = MaterialTheme.typography.labelMedium,
+					modifier = Modifier.padding(bottom = 8.dp)
+				)
+				Slider(
+					value = progress,
+					onValueChange = { 
+						progress = it
+						val newPos = (it * exoPlayer.duration).toLong()
+						if (newPos >= 0) exoPlayer.seekTo(newPos)
+					},
+					modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Seek" }
+				)
+				Row(
+					modifier = Modifier.fillMaxWidth().clearAndSetSemantics { }, 
+					horizontalArrangement = Arrangement.SpaceBetween
 				) {
-					Icon(Icons.Default.SkipPrevious, contentDescription = "Previous")
+					Text(formatTime(currentTime))
+					Text(formatTime(totalTime))
 				}
-				IconButton(onClick = {
-					val newTime = (exoPlayer.currentPosition - 10000).coerceAtLeast(0)
-					exoPlayer.seekTo(newTime)
-				}) {
-					Icon(Icons.Default.FastRewind, contentDescription = "Rewind")
-				}
-				IconButton(onClick = { if (isPlaying) exoPlayer.pause() else exoPlayer.play() }) {
-					Icon(
-						if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, 
-						contentDescription = if (isPlaying) "Pause" else "Play"
-					)
-				}
-				IconButton(onClick = {
-					val dur = exoPlayer.duration
-					val newTime = (exoPlayer.currentPosition + 10000).coerceAtMost(if (dur > 0) dur else 0)
-					exoPlayer.seekTo(newTime)
-				}) {
-					Icon(Icons.Default.FastForward, contentDescription = "Forward")
-				}
-				IconButton(
-					onClick = { if (currentIndex < playlist.uris.size - 1) currentIndex++ },
-					enabled = currentIndex < playlist.uris.size - 1
+				Row(
+					modifier = Modifier.fillMaxWidth(),
+					horizontalArrangement = Arrangement.SpaceEvenly,
+					verticalAlignment = Alignment.CenterVertically
 				) {
-					Icon(Icons.Default.SkipNext, contentDescription = "Next")
-				}
-				Box {
 					IconButton(
-						onClick = { showMoreOptions = true },
-						modifier = Modifier.semantics {
-							contentDescription = "More Options"
-							customActions = listOf(
-								CustomAccessibilityAction("Search within playlist") {
-									showSearchDialog = true
-									true
-								},
-								CustomAccessibilityAction("Playlist info") {
-									showInfoDialog = true
-									true
-								},
-								CustomAccessibilityAction(if (playlist.isHidden) "Unlock" else "Hide") {
-									onHide()
-									true
-								},
-								CustomAccessibilityAction("Remove") {
-									onRemove()
-									true
-								}
-							)
-						}
+						onClick = { if (currentIndex > 0) { currentIndex--; playIndex(currentIndex) } },
+						enabled = currentIndex > 0
 					) {
-						Icon(Icons.Default.MoreVert, contentDescription = null)
+						Icon(Icons.Default.SkipPrevious, contentDescription = "Previous")
 					}
-					DropdownMenu(expanded = showMoreOptions, onDismissRequest = { showMoreOptions = false }) {
-						DropdownMenuItem(
-							text = { Text("Search within playlist") },
-							onClick = { showSearchDialog = true; showMoreOptions = false },
-							leadingIcon = { Icon(Icons.Default.Search, null) }
+					IconButton(onClick = { if (isPlaying) exoPlayer.pause() else exoPlayer.play() }) {
+						Icon(
+							if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, 
+							contentDescription = if (isPlaying) "Pause" else "Play"
 						)
-						DropdownMenuItem(
-							text = { Text("Playlist info") },
-							onClick = { showInfoDialog = true; showMoreOptions = false },
-							leadingIcon = { Icon(Icons.Default.Info, null) }
-						)
-						DropdownMenuItem(
-							text = { Text(if (playlist.isHidden) "Unlock Playlist" else "Hide Playlist") },
-							onClick = { onHide(); showMoreOptions = false },
-							leadingIcon = { Icon(if (playlist.isHidden) Icons.Default.LockOpen else Icons.Default.Lock, null) }
-						)
-						DropdownMenuItem(
-							text = { Text("Remove Playlist") },
-							onClick = { onRemove(); showMoreOptions = false },
-							leadingIcon = { Icon(Icons.Default.Delete, null) }
-						)
+					}
+					IconButton(
+						onClick = { if (currentIndex < playlist.uris.size - 1) { currentIndex++; playIndex(currentIndex) } },
+						enabled = currentIndex < playlist.uris.size - 1
+					) {
+						Icon(Icons.Default.SkipNext, contentDescription = "Next")
+					}
+					Box {
+						IconButton(
+							onClick = { showMoreOptions = true },
+							modifier = Modifier.semantics {
+								contentDescription = "More Options"
+								val actions = mutableListOf(
+									CustomAccessibilityAction("Search within playlist") {
+										showSearchDialog = true
+										true
+									},
+									CustomAccessibilityAction("Playlist info") {
+										showInfoDialog = true
+										true
+									}
+								)
+								if (canModifyPlaylist) {
+									actions.add(
+										CustomAccessibilityAction(if (playlist.isHidden) "Unlock" else "Hide") {
+											onHide()
+											true
+										}
+									)
+									actions.add(
+										CustomAccessibilityAction("Remove") {
+											onRemove()
+											true
+										}
+									)
+								}
+								customActions = actions
+							}
+						) {
+							Icon(Icons.Default.MoreVert, contentDescription = null)
+						}
+						DropdownMenu(expanded = showMoreOptions, onDismissRequest = { showMoreOptions = false }) {
+							DropdownMenuItem(
+								text = { Text("Search within playlist") },
+								onClick = { showSearchDialog = true; showMoreOptions = false },
+								leadingIcon = { Icon(Icons.Default.Search, null) }
+							)
+							DropdownMenuItem(
+								text = { Text("Playlist info") },
+								onClick = { showInfoDialog = true; showMoreOptions = false },
+								leadingIcon = { Icon(Icons.Default.Info, null) }
+							)
+							if (canModifyPlaylist) {
+								DropdownMenuItem(
+									text = { Text(if (playlist.isHidden) "Unlock Playlist" else "Hide Playlist") },
+									onClick = { onHide(); showMoreOptions = false },
+									leadingIcon = { Icon(if (playlist.isHidden) Icons.Default.LockOpen else Icons.Default.Lock, null) }
+								)
+								DropdownMenuItem(
+									text = { Text("Remove Playlist") },
+									onClick = { onRemove(); showMoreOptions = false },
+									leadingIcon = { Icon(Icons.Default.Delete, null) }
+								)
+							}
+						}
 					}
 				}
 			}
