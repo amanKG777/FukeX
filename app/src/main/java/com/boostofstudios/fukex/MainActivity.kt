@@ -266,8 +266,11 @@ fun MainScreen(modifier: Modifier = Modifier) {
 								Spacer(Modifier.width(4.dp))
 							}
 							Text(playlist.name)
-							IconButton(onClick = { showPlaylistActions = playlist }) {
-								Icon(Icons.Default.MoreVert, contentDescription = "Actions for ${playlist.name}")
+							IconButton(
+								onClick = { showPlaylistActions = playlist },
+								modifier = Modifier.clearAndSetSemantics { }
+							) {
+								Icon(Icons.Default.MoreVert, contentDescription = null)
 							}
 						}
 					}
@@ -288,22 +291,16 @@ fun MainScreen(modifier: Modifier = Modifier) {
 					)
 					Spacer(modifier = Modifier.height(32.dp))
 					Row {
-						Button(
-							onClick = { showOptionsDialog = true },
-							modifier = Modifier.semantics { contentDescription = "Play" }
-						) {
+						Button(onClick = { showOptionsDialog = true }) {
 							Icon(Icons.Default.PlayArrow, contentDescription = null)
 							Spacer(Modifier.width(8.dp))
 							Text("Play")
 						}
 						Spacer(Modifier.width(16.dp))
-						Button(
-							onClick = { importLauncher.launch(arrayOf("application/json")) },
-							modifier = Modifier.semantics { contentDescription = "Import Playlist" }
-						) {
+						Button(onClick = { importLauncher.launch(arrayOf("application/json")) }) {
 							Icon(Icons.Default.FileDownload, contentDescription = null)
 							Spacer(Modifier.width(8.dp))
-							Text("Import")
+							Text("Import Playlist")
 						}
 					}
 					if (playlists.any { it.isHidden && it.id !in unlockedPlaylistIds }) {
@@ -349,6 +346,7 @@ fun MainScreen(modifier: Modifier = Modifier) {
 	}
 	showPlaylistActions?.let { playlist ->
 		AlertDialog(
+			modifier = Modifier.semantics { paneTitle = "Actions: ${playlist.name}" },
 			onDismissRequest = { showPlaylistActions = null },
 			title = { Text("Actions: ${playlist.name}") },
 			text = {
@@ -431,6 +429,7 @@ fun MainScreen(modifier: Modifier = Modifier) {
 	}
 	if (showPlaylistSelectionDialog) {
 		AlertDialog(
+			modifier = Modifier.semantics { paneTitle = "Select Playlist to View" },
 			onDismissRequest = { showPlaylistSelectionDialog = false },
 			title = { Text("Select Playlist to View") },
 			text = {
@@ -454,6 +453,7 @@ fun MainScreen(modifier: Modifier = Modifier) {
 	showPinSetupDialog?.let { playlist ->
 		var expanded by remember { mutableStateOf(false) }
 		AlertDialog(
+			modifier = Modifier.semantics { paneTitle = "Set PIN/Password to hide playlist" },
 			onDismissRequest = { showPinSetupDialog = null },
 			title = { Text("Set PIN/Password to hide playlist") },
 			text = {
@@ -507,6 +507,7 @@ fun MainScreen(modifier: Modifier = Modifier) {
 	}
 	showPinDialog?.let { playlist ->
 		AlertDialog(
+			modifier = Modifier.semantics { paneTitle = "Unlock ${playlist.name}" },
 			onDismissRequest = { 
 				showPinDialog = null
 				authError = ""
@@ -554,6 +555,7 @@ fun MainScreen(modifier: Modifier = Modifier) {
 	}
 	showConfirmUnlockDialog?.let { playlist ->
 		AlertDialog(
+			modifier = Modifier.semantics { paneTitle = "Permanently Unlock ${playlist.name}" },
 			onDismissRequest = { 
 				showConfirmUnlockDialog = null
 				authError = ""
@@ -602,6 +604,7 @@ fun MainScreen(modifier: Modifier = Modifier) {
 	}
 	if (showOptionsDialog) {
 		AlertDialog(
+			modifier = Modifier.semantics { paneTitle = "Select what you would like to play" },
 			onDismissRequest = { showOptionsDialog = false },
 			title = { Text("Select what you would like to play") },
 			text = {
@@ -611,7 +614,7 @@ fun MainScreen(modifier: Modifier = Modifier) {
 							showOptionsDialog = false
 							folderPickerLauncher.launch(null)
 						},
-						modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).semantics { contentDescription = "Playlist" }
+						modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
 					) {
 						Text("Playlist (Folder)")
 					}
@@ -620,7 +623,7 @@ fun MainScreen(modifier: Modifier = Modifier) {
 							showOptionsDialog = false
 							filePickerLauncher.launch(arrayOf("*/*"))
 						},
-						modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).semantics { contentDescription = "File" }
+						modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
 					) {
 						Text("File")
 					}
@@ -635,6 +638,7 @@ fun MainScreen(modifier: Modifier = Modifier) {
 	}
 	if (showNameDialog) {
 		AlertDialog(
+			modifier = Modifier.semantics { paneTitle = "Name your playlist" },
 			onDismissRequest = { showNameDialog = false },
 			title = { Text("Name your playlist") },
 			text = {
@@ -811,7 +815,7 @@ fun VLCPlayer(
 			modifier = Modifier.fillMaxWidth().padding(8.dp),
 			verticalAlignment = Alignment.CenterVertically
 		) {
-			IconButton(onClick = onBack, modifier = Modifier.semantics { contentDescription = "Back" }) {
+			IconButton(onClick = onBack) {
 				Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
 			}
 			Column(modifier = Modifier.weight(1f).padding(start = 8.dp)) {
@@ -852,20 +856,19 @@ fun VLCPlayer(
 				horizontalArrangement = Arrangement.SpaceEvenly,
 				verticalAlignment = Alignment.CenterVertically
 			) {
-				IconButton(onClick = {
-					if (currentIndex > 0) currentIndex--
-				}, enabled = currentIndex > 0, modifier = Modifier.semantics { contentDescription = "Previous" }) {
+				IconButton(
+					onClick = { if (currentIndex > 0) currentIndex-- },
+					enabled = currentIndex > 0
+				) {
 					Icon(Icons.Default.SkipPrevious, contentDescription = "Previous")
 				}
 				IconButton(onClick = {
 					val newTime = (mediaPlayer.time - 10000).coerceAtLeast(0)
 					mediaPlayer.time = newTime
-				}, modifier = Modifier.semantics { contentDescription = "Rewind" }) {
+				}) {
 					Icon(Icons.Default.FastRewind, contentDescription = "Rewind")
 				}
-				IconButton(onClick = {
-					if (isPlaying) mediaPlayer.pause() else mediaPlayer.play()
-				}, modifier = Modifier.semantics { contentDescription = if (isPlaying) "Pause" else "Play" }) {
+				IconButton(onClick = { if (isPlaying) mediaPlayer.pause() else mediaPlayer.play() }) {
 					Icon(
 						if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, 
 						contentDescription = if (isPlaying) "Pause" else "Play"
@@ -874,12 +877,13 @@ fun VLCPlayer(
 				IconButton(onClick = {
 					val newTime = (mediaPlayer.time + 10000).coerceAtMost(totalTime)
 					mediaPlayer.time = newTime
-				}, modifier = Modifier.semantics { contentDescription = "Forward" }) {
+				}) {
 					Icon(Icons.Default.FastForward, contentDescription = "Forward")
 				}
-				IconButton(onClick = {
-					if (currentIndex < playlist.uris.size - 1) currentIndex++
-				}, enabled = currentIndex < playlist.uris.size - 1, modifier = Modifier.semantics { contentDescription = "Next" }) {
+				IconButton(
+					onClick = { if (currentIndex < playlist.uris.size - 1) currentIndex++ },
+					enabled = currentIndex < playlist.uris.size - 1
+				) {
 					Icon(Icons.Default.SkipNext, contentDescription = "Next")
 				}
 				Box {
@@ -938,6 +942,7 @@ fun VLCPlayer(
 
 	if (showSearchDialog) {
 		AlertDialog(
+			modifier = Modifier.semantics { paneTitle = "Search Track" },
 			onDismissRequest = { showSearchDialog = false },
 			title = { Text("Search Track") },
 			text = {
@@ -974,6 +979,7 @@ fun VLCPlayer(
 
 	if (showInfoDialog) {
 		AlertDialog(
+			modifier = Modifier.semantics { paneTitle = "Playlist Info" },
 			onDismissRequest = { showInfoDialog = false },
 			title = { Text("Playlist Info") },
 			text = {
