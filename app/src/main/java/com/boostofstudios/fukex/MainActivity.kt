@@ -226,10 +226,10 @@ fun MainScreen(modifier: Modifier = Modifier) {
 							}
 						)
 						if (playlists.size > 1) {
-							actions.add(
-								CustomAccessibilityAction("Move Left") {
-									val idx = playlists.indexOf(playlist)
-									if (idx > 0) {
+							val idx = playlists.indexOf(playlist)
+							if (idx > 0) {
+								actions.add(
+									CustomAccessibilityAction("Move Left") {
 										val newList = playlists.toMutableList()
 										java.util.Collections.swap(newList, idx, idx - 1)
 										playlists = newList
@@ -237,13 +237,12 @@ fun MainScreen(modifier: Modifier = Modifier) {
 											PlaylistManager.savePlaylists(context, newList)
 										}
 										true
-									} else false
-								}
-							)
-							actions.add(
-								CustomAccessibilityAction("Move Right") {
-									val idx = playlists.indexOf(playlist)
-									if (idx < playlists.size - 1) {
+									}
+								)
+							}
+							if (idx < playlists.size - 1) {
+								actions.add(
+									CustomAccessibilityAction("Move Right") {
 										val newList = playlists.toMutableList()
 										java.util.Collections.swap(newList, idx, idx + 1)
 										playlists = newList
@@ -251,9 +250,9 @@ fun MainScreen(modifier: Modifier = Modifier) {
 											PlaylistManager.savePlaylists(context, newList)
 										}
 										true
-									} else false
-								}
-							)
+									}
+								)
+							}
 						}
 						if (playlists.size > 1) {
 							actions.add(
