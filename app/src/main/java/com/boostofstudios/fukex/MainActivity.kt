@@ -1,5 +1,6 @@
 package com.boostofstudios.fukex
 import android.content.Intent
+import android.media.audiofx.LoudnessEnhancer
 import android.net.Uri
 import android.os.Bundle
 import android.os.ParcelFileDescriptor
@@ -14,7 +15,23 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AudioFile
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
@@ -40,6 +57,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.C
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import java.io.OutputStreamWriter
@@ -773,6 +791,30 @@ fun AudioPlayerView(
 	var showInfoDialog by remember { mutableStateOf(false) }
 	var searchQuery by remember { mutableStateOf("") }
 	var playlistSize by remember { mutableLongStateOf(0L) }
+	var amplifierEnabled by remember { mutableStateOf(SettingsManager.isAmplifierEnabled(context)) }
+	val amplifierLevel = remember { SettingsManager.getAmplifierLevel(context) }
+	var loudnessEnhancer by remember { mutableStateOf<LoudnessEnhancer?>(null) }
+
+	fun updateAmplifier(sessionId: Int) {
+		try {
+			loudnessEnhancer?.release()
+			if (amplifierEnabled && sessionId != C.AUDIO_SESSION_ID_UNSET) {
+				loudnessEnhancer = LoudnessEnhancer(sessionId).apply {
+					setTargetGain(amplifierLevel)
+					enabled = true
+				}
+			} else {
+				loudnessEnhancer = null
+			}
+		} catch (e: Exception) {
+			e.printStackTrace()
+		}
+	}
+
+	LaunchedEffect(amplifierEnabled) {
+		updateAmplifier(exoPlayer.audioSessionId)
+	}
+
 	LaunchedEffect(showInfoDialog) {
 		if (showInfoDialog) {
 			withContext(Dispatchers.IO) {
@@ -850,9 +892,14 @@ fun AudioPlayerView(
 					}
 				}
 			}
+
+			override fun onAudioSessionIdChanged(audioSessionId: Int) {
+				updateAmplifier(audioSessionId)
+			}
 		}
 		exoPlayer.addListener(listener)
 		onDispose {
+			loudnessEnhancer?.release()
 			exoPlayer.release()
 		}
 	}
@@ -983,6 +1030,11 @@ fun AudioPlayerView(
 									CustomAccessibilityAction("Playlist info") {
 										showInfoDialog = true
 										true
+									},
+									CustomAccessibilityAction(if (amplifierEnabled) "Disable Amplifier" else "Enable Amplifier (Boost ${amplifierLevel / 100}dB)") {
+										amplifierEnabled = !amplifierEnabled
+										SettingsManager.setAmplifierEnabled(context, amplifierEnabled)
+										true
 									}
 								)
 								if (canModifyPlaylist) {
@@ -1014,6 +1066,15 @@ fun AudioPlayerView(
 								text = { Text("Playlist info") },
 								onClick = { showInfoDialog = true; showMoreOptions = false },
 								leadingIcon = { Icon(Icons.Default.Info, null) }
+							)
+							DropdownMenuItem(
+								text = { Text(if (amplifierEnabled) "Disable Amplifier" else "Enable Amplifier (Boost ${amplifierLevel / 100}dB)") },
+								onClick = { 
+									amplifierEnabled = !amplifierEnabled
+									SettingsManager.setAmplifierEnabled(context, amplifierEnabled)
+									showMoreOptions = false 
+								},
+								leadingIcon = { Icon(if (amplifierEnabled) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff, null) }
 							)
 							if (canModifyPlaylist) {
 								DropdownMenuItem(

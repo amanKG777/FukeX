@@ -14,9 +14,27 @@ object SettingsManager {
     private const val KEY_BIOMETRIC_ENABLED = "biometric_enabled"
     private const val KEY_BACKGROUND_PLAYBACK = "background_playback"
     private const val KEY_LOCK_TIMEOUT = "lock_timeout"
+    private const val KEY_AMPLIFIER_LEVEL = "amplifier_level"
+    private const val KEY_AMPLIFIER_ENABLED = "amplifier_enabled"
 
     private fun getPrefs(context: Context): SharedPreferences {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    }
+
+    fun getAmplifierLevel(context: Context): Int {
+        return getPrefs(context).getInt(KEY_AMPLIFIER_LEVEL, 0)
+    }
+
+    fun setAmplifierLevel(context: Context, level: Int) {
+        getPrefs(context).edit().putInt(KEY_AMPLIFIER_LEVEL, level).apply()
+    }
+
+    fun isAmplifierEnabled(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_AMPLIFIER_ENABLED, false)
+    }
+
+    fun setAmplifierEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_AMPLIFIER_ENABLED, enabled).apply()
     }
 
     fun isBiometricEnabled(context: Context): Boolean {

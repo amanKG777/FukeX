@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LockClock
 import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -43,6 +44,9 @@ fun SettingsScreen(
 	var isBackgroundPlaybackEnabled by remember { mutableStateOf(SettingsManager.isBackgroundPlaybackEnabled(context)) }
 	var lockTimeout by remember { mutableStateOf(SettingsManager.getLockTimeout(context)) }
 	var showTimeoutDialog by remember { mutableStateOf(false) }
+	var amplifierLevel by remember { mutableIntStateOf(SettingsManager.getAmplifierLevel(context)) }
+	var showAmplifierWarning by remember { mutableStateOf(false) }
+	var pendingAmplifierLevel by remember { mutableIntStateOf(0) }
 
 	fun authenticateAndEnableBiometrics(enabled: Boolean) {
 		if (!enabled) {
@@ -119,6 +123,34 @@ fun SettingsScreen(
 						isBackgroundPlaybackEnabled = it 
 					}
 				)
+				ListItem(
+					headlineContent = { Text("Amplifier Boost: ${amplifierLevel / 100} dB") },
+					supportingContent = {
+						Column {
+							Text("Increase volume beyond standard limits.")
+							Slider(
+								value = (amplifierLevel / 500).toFloat(),
+								onValueChange = { 
+									val newLevel = (it.toInt() * 500)
+									if (newLevel > 1500 && newLevel > amplifierLevel) {
+										pendingAmplifierLevel = newLevel
+										showAmplifierWarning = true
+									} else {
+										amplifierLevel = newLevel
+										SettingsManager.setAmplifierLevel(context, newLevel)
+									}
+								},
+								valueRange = 0f..5f,
+								steps = 4,
+								modifier = Modifier.fillMaxWidth().semantics { 
+									contentDescription = "Amplifier slider"
+									stateDescription = "${amplifierLevel / 100} decibels"
+								}
+							)
+						}
+					},
+					leadingContent = { Icon(Icons.AutoMirrored.Filled.VolumeUp, null) }
+				)
 			}
 			item {
 				SettingsHeader("About")
@@ -162,6 +194,25 @@ fun SettingsScreen(
 			}
 		)
 	}
+	if (showAmplifierWarning) {
+		AlertDialog(
+			onDismissRequest = { showAmplifierWarning = false },
+			title = { Text("Speaker Damage Warning") },
+			text = {
+				Text("Increasing the amplifier boost above 15dB may damage your speakers. By continuing, you agree that you are responsible for any damage, not the product.")
+			},
+			confirmButton = {
+				TextButton(onClick = { 
+					amplifierLevel = pendingAmplifierLevel
+					SettingsManager.setAmplifierLevel(context, pendingAmplifierLevel)
+					showAmplifierWarning = false 
+				}) { Text("OK") }
+			},
+			dismissButton = {
+				TextButton(onClick = { showAmplifierWarning = false }) { Text("Cancel") }
+			}
+		)
+	}
 }
 
 @Composable
@@ -202,3 +253,4 @@ fun SettingsToggleItem(
 			}
 	)
 }
+
