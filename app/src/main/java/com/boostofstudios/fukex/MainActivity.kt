@@ -46,7 +46,16 @@ import androidx.media3.ui.PlayerView
 import java.io.OutputStreamWriter
 import java.util.UUID
 
-class MainActivity : ComponentActivity() {
+import androidx.fragment.app.FragmentActivity
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
+import com.boostofstudios.fukex.data.LockTimeout
+import com.boostofstudios.fukex.data.SettingsManager
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+
+class MainActivity : FragmentActivity() {
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
 		enableEdgeToEdge()
@@ -83,6 +92,71 @@ fun MainScreen(modifier: Modifier = Modifier) {
 	var showPlaylistSelectionDialog by remember { mutableStateOf(false) }
 	var authError by remember { mutableStateOf("") }
 	var showFilePicker by remember { mutableStateOf(false) }
+
+	var showSettings by remember { mutableStateOf(false) }
+	var lastActiveTimes by remember { mutableStateOf(mapOf<String, Long>()) }
+	var currentlyPlayingPlaylistId by remember { mutableStateOf<String?>(null) }
+
+	val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+
+	LaunchedEffect(unlockedPlaylistIds, currentlyPlayingPlaylistId, lastActiveTimes) {
+		while (true) {
+			kotlinx.coroutines.delay(10000) // Check every 10 seconds
+			val timeout = SettingsManager.getLockTimeout(context)
+			if (timeout != LockTimeout.IMMEDIATE && timeout != LockTimeout.SCREEN_LOCK) {
+				val now = System.currentTimeMillis()
+				val toLock = unlockedPlaylistIds.filter { id ->
+					id != currentlyPlayingPlaylistId && 
+					(now - (lastActiveTimes[id] ?: now)) > (timeout.minutes * 60 * 1000)
+				}
+				if (toLock.isNotEmpty()) {
+					unlockedPlaylistIds = unlockedPlaylistIds - toLock.toSet()
+				}
+			}
+		}
+	}
+
+	DisposableEffect(lifecycleOwner) {
+		val observer = LifecycleEventObserver { _, event ->
+			if (event == Lifecycle.Event.ON_STOP) {
+				if (SettingsManager.getLockTimeout(context) == LockTimeout.SCREEN_LOCK) {
+					unlockedPlaylistIds = emptySet()
+				}
+			}
+		}
+		lifecycleOwner.lifecycle.addObserver(observer)
+		onDispose {
+			lifecycleOwner.lifecycle.removeObserver(observer)
+		}
+	}
+
+	fun authenticateWithBiometrics(onSuccess: () -> Unit, onError: (String) -> Unit) {
+		val executor = ContextCompat.getMainExecutor(context)
+		val fragmentActivity = context as? FragmentActivity ?: return
+		val biometricPrompt = BiometricPrompt(fragmentActivity, executor,
+			object : BiometricPrompt.AuthenticationCallback() {
+				override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+					super.onAuthenticationSucceeded(result)
+					onSuccess()
+				}
+				override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+					super.onAuthenticationError(errorCode, errString)
+					onError(errString.toString())
+				}
+			})
+
+		val promptInfo = BiometricPrompt.PromptInfo.Builder()
+			.setTitle("Unlock Playlist")
+			.setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL)
+			.build()
+
+		biometricPrompt.authenticate(promptInfo)
+	}
+
+	if (showSettings) {
+		SettingsScreen(onBack = { showSettings = false })
+		return
+	}
 
 	LaunchedEffect(Unit) {
 		if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
@@ -189,6 +263,9 @@ fun MainScreen(modifier: Modifier = Modifier) {
 						IconButton(onClick = { showPlaylistSelectionDialog = true }) {
 							Icon(Icons.Default.Lock, contentDescription = "View Locked Playlists")
 						}
+					}
+					IconButton(onClick = { showSettings = true }) {
+						Icon(Icons.Default.Settings, contentDescription = "Settings")
 					}
 				}
 			)
@@ -319,6 +396,12 @@ Box(modifier = Modifier.weight(1f)) {
 								PlaylistManager.updatePlaylistProgress(context, currentPlaylist.id, index, pos)
 							}
 						},
+						onPlayStateChanged = { playing ->
+							currentlyPlayingPlaylistId = if (playing) currentPlaylist.id else null
+							if (playing) {
+								lastActiveTimes = lastActiveTimes + (currentPlaylist.id to System.currentTimeMillis())
+							}
+						},
 						onHide = {
 							if (currentPlaylist.isHidden) {
 								showConfirmUnlockDialog = currentPlaylist
@@ -445,8 +528,25 @@ Box(modifier = Modifier.weight(1f)) {
 						ListItem(
 							headlineContent = { Text(playlist.name) },
 							modifier = Modifier.clickable {
-								showPinDialog = playlist
 								showPlaylistSelectionDialog = false
+								if (SettingsManager.isBiometricEnabled(context)) {
+									authenticateWithBiometrics(
+										onSuccess = {
+											val nextUnlockedIds = unlockedPlaylistIds + playlist.id
+											unlockedPlaylistIds = nextUnlockedIds
+											lastActiveTimes = lastActiveTimes + (playlist.id to System.currentTimeMillis())
+											
+											val nextVisible = playlists.filter { !it.isHidden || it.id in nextUnlockedIds }
+											val targetIdx = nextVisible.indexOfFirst { it.id == playlist.id }
+											if (targetIdx != -1) {
+												selectedTabIndex = targetIdx
+											}
+										},
+										onError = { showPinDialog = playlist }
+									)
+								} else {
+									showPinDialog = playlist
+								}
 							}
 						)
 					}
@@ -666,6 +766,7 @@ fun AudioPlayerView(
 	modifier: Modifier = Modifier,
 	canModifyPlaylist: Boolean,
 	onProgressUpdate: (Int, Float) -> Unit,
+	onPlayStateChanged: (Boolean) -> Unit,
 	onHide: () -> Unit,
 	onRemove: () -> Unit,
 	onUpdatePlaylist: (Playlist) -> Unit
@@ -726,6 +827,7 @@ fun AudioPlayerView(
 			}
 			isInitialPlayback = false
 		}
+		onPlayStateChanged(isPlaying)
 	}
 
 	LaunchedEffect(currentIndex, isPlaying) {
