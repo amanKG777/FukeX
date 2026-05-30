@@ -1,5 +1,4 @@
 package com.boostofstudios.fukex.data
-
 import android.content.Context
 import android.net.Uri
 import org.json.JSONArray
@@ -53,14 +52,12 @@ object PlaylistManager {
 				return emptyList()
 			}
 		}
-
 		val jsonString = try {
 			file.readText()
 		} catch (e: Exception) {
 			e.printStackTrace()
 			return emptyList()
 		}
-
 		val playlists = mutableListOf<Playlist>()
 		try {
 			val jsonArray = JSONArray(jsonString)

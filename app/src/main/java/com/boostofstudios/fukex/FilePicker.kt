@@ -1,5 +1,4 @@
 package com.boostofstudios.fukex
-
 import android.net.Uri
 import android.os.Environment
 import androidx.activity.compose.BackHandler
@@ -38,7 +37,6 @@ fun FilePickerScreen(
 	var currentDir by remember { mutableStateOf(root) }
 	var files by remember { mutableStateOf<List<File>>(emptyList()) }
 	var isScanning by remember { mutableStateOf(false) }
-
 	LaunchedEffect(currentDir) {
 		withContext(Dispatchers.IO) {
 			val listed = currentDir.listFiles()
@@ -49,7 +47,6 @@ fun FilePickerScreen(
 			}
 		}
 	}
-
 	BackHandler {
 		if (currentDir.absolutePath == root.absolutePath) {
 			onCancel()
@@ -57,7 +54,6 @@ fun FilePickerScreen(
 			currentDir = currentDir.parentFile ?: root
 		}
 	}
-
 	Scaffold(
 		topBar = {
 			TopAppBar(
@@ -90,7 +86,6 @@ fun FilePickerScreen(
 				items(files) { file ->
 					val isDir = file.isDirectory
 					val isMedia = file.isMediaFile()
-					
 					ListItem(
 						headlineContent = { Text(file.name) },
 						leadingContent = {

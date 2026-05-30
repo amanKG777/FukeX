@@ -1,8 +1,6 @@
 package com.boostofstudios.fukex.data
-
 import android.content.Context
 import android.content.SharedPreferences
-
 enum class LockTimeout(val minutes: Int, val label: String) {
     IMMEDIATE(0, "Immediate"),
     ONE_MINUTE(1, "1 Minute"),

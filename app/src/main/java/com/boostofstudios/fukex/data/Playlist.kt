@@ -1,7 +1,5 @@
 package com.boostofstudios.fukex.data
-
 import android.net.Uri
-
 enum class AuthType {
 	PIN, PASSWORD
 }

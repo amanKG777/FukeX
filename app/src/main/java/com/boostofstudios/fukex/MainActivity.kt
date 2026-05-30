@@ -1,5 +1,4 @@
 package com.boostofstudios.fukex
-
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -45,7 +44,6 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import java.io.OutputStreamWriter
 import java.util.UUID
-
 import androidx.fragment.app.FragmentActivity
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
@@ -92,13 +90,10 @@ fun MainScreen(modifier: Modifier = Modifier) {
 	var showPlaylistSelectionDialog by remember { mutableStateOf(false) }
 	var authError by remember { mutableStateOf("") }
 	var showFilePicker by remember { mutableStateOf(false) }
-
 	var showSettings by remember { mutableStateOf(false) }
 	var lastActiveTimes by remember { mutableStateOf(mapOf<String, Long>()) }
 	var currentlyPlayingPlaylistId by remember { mutableStateOf<String?>(null) }
-
 	val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-
 	LaunchedEffect(unlockedPlaylistIds, currentlyPlayingPlaylistId, lastActiveTimes) {
 		while (true) {
 			kotlinx.coroutines.delay(10000) // Check every 10 seconds
@@ -115,11 +110,11 @@ fun MainScreen(modifier: Modifier = Modifier) {
 			}
 		}
 	}
-
 	DisposableEffect(lifecycleOwner) {
 		val observer = LifecycleEventObserver { _, event ->
 			if (event == Lifecycle.Event.ON_STOP) {
-				if (SettingsManager.getLockTimeout(context) == LockTimeout.SCREEN_LOCK) {
+				val timeout = SettingsManager.getLockTimeout(context)
+				if (timeout == LockTimeout.SCREEN_LOCK || timeout == LockTimeout.IMMEDIATE) {
 					unlockedPlaylistIds = emptySet()
 				}
 			}
@@ -134,30 +129,24 @@ fun MainScreen(modifier: Modifier = Modifier) {
 		val executor = ContextCompat.getMainExecutor(context)
 		val fragmentActivity = context as? FragmentActivity ?: return
 		val biometricPrompt = BiometricPrompt(fragmentActivity, executor,
+
 			object : BiometricPrompt.AuthenticationCallback() {
 				override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
 					super.onAuthenticationSucceeded(result)
 					onSuccess()
 				}
+
 				override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
 					super.onAuthenticationError(errorCode, errString)
 					onError(errString.toString())
 				}
 			})
-
 		val promptInfo = BiometricPrompt.PromptInfo.Builder()
 			.setTitle("Unlock Playlist")
 			.setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL)
 			.build()
-
 		biometricPrompt.authenticate(promptInfo)
 	}
-
-	if (showSettings) {
-		SettingsScreen(onBack = { showSettings = false })
-		return
-	}
-
 	LaunchedEffect(Unit) {
 		if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
 			if (!android.os.Environment.isExternalStorageManager()) {
@@ -167,30 +156,7 @@ fun MainScreen(modifier: Modifier = Modifier) {
 			}
 		}
 	}
-
 	val visiblePlaylists = playlists.filter { !it.isHidden || it.id in unlockedPlaylistIds }
-
-	if (showFilePicker) {
-		FilePickerScreen(
-			onFilesSelected = { uris ->
-				showFilePicker = false
-				if (uris.isNotEmpty() && visiblePlaylists.isNotEmpty()) {
-					val safeIndex = kotlin.math.min(selectedTabIndex, visiblePlaylists.lastIndex)
-					if (safeIndex >= 0) {
-						val currentPlaylist = visiblePlaylists[safeIndex]
-						val updatedPlaylist = currentPlaylist.copy(uris = currentPlaylist.uris + uris)
-						val newList = playlists.map { if (it.id == currentPlaylist.id) updatedPlaylist else it }
-						playlists = newList
-						scope.launch(Dispatchers.IO) {
-							PlaylistManager.savePlaylists(context, newList)
-						}
-					}
-				}
-			},
-			onCancel = { showFilePicker = false }
-		)
-		return
-	}
 	val importLauncher = rememberLauncherForActivityResult(
 		contract = ActivityResultContracts.OpenDocument()
 	) { uri: Uri? ->
@@ -249,7 +215,8 @@ fun MainScreen(modifier: Modifier = Modifier) {
 			}
 		}
 	}
-	Scaffold(
+	Box(modifier = Modifier.fillMaxSize()) {
+		Scaffold(
 		modifier = Modifier.semantics { isTraversalGroup = true },
 		topBar = {
 			@OptIn(ExperimentalMaterial3Api::class)
@@ -423,6 +390,7 @@ Box(modifier = Modifier.weight(1f)) {
 							scope.launch(Dispatchers.IO) {
 								PlaylistManager.savePlaylists(context, newList)
 							}
+							lastActiveTimes = lastActiveTimes + (updatedPlaylist.id to System.currentTimeMillis())
 						}
 					)
 				}
@@ -535,7 +503,6 @@ Box(modifier = Modifier.weight(1f)) {
 											val nextUnlockedIds = unlockedPlaylistIds + playlist.id
 											unlockedPlaylistIds = nextUnlockedIds
 											lastActiveTimes = lastActiveTimes + (playlist.id to System.currentTimeMillis())
-											
 											val nextVisible = playlists.filter { !it.isHidden || it.id in nextUnlockedIds }
 											val targetIdx = nextVisible.indexOfFirst { it.id == playlist.id }
 											if (targetIdx != -1) {
@@ -646,7 +613,6 @@ Box(modifier = Modifier.weight(1f)) {
 						authError = ""
 						pinInput = ""
 						showPinDialog = null
-						
 						// Calculate target index in the next state of visiblePlaylists
 						val nextVisible = playlists.filter { !it.isHidden || it.id in nextUnlockedIds }
 						val targetIdx = nextVisible.indexOfFirst { it.id == playlist.id }
@@ -709,7 +675,6 @@ Box(modifier = Modifier.weight(1f)) {
 			}
 		)
 	}
-
 	if (showNameDialog) {
 		AlertDialog(
 			modifier = Modifier.semantics { paneTitle = "Name your playlist" },
@@ -757,8 +722,32 @@ Box(modifier = Modifier.weight(1f)) {
 			}
 		)
 	}
+		if (showFilePicker) {
+			FilePickerScreen(
+				onFilesSelected = { uris ->
+					showFilePicker = false
+					if (uris.isNotEmpty() && visiblePlaylists.isNotEmpty()) {
+						val safeIndex = kotlin.math.min(selectedTabIndex, visiblePlaylists.lastIndex)
+						if (safeIndex >= 0) {
+							val currentPlaylist = visiblePlaylists[safeIndex]
+							val updatedPlaylist = currentPlaylist.copy(uris = currentPlaylist.uris + uris)
+							val newList = playlists.map { if (it.id == currentPlaylist.id) updatedPlaylist else it }
+							playlists = newList
+							scope.launch(Dispatchers.IO) {
+								PlaylistManager.savePlaylists(context, newList)
+							}
+							lastActiveTimes = lastActiveTimes + (currentPlaylist.id to System.currentTimeMillis())
+						}
+					}
+				},
+				onCancel = { showFilePicker = false }
+			)
+		}
+		if (showSettings) {
+			SettingsScreen(onBack = { showSettings = false })
+		}
+	}
 }
-
 
 @Composable
 fun AudioPlayerView(
@@ -784,7 +773,6 @@ fun AudioPlayerView(
 	var showInfoDialog by remember { mutableStateOf(false) }
 	var searchQuery by remember { mutableStateOf("") }
 	var playlistSize by remember { mutableLongStateOf(0L) }
-
 	LaunchedEffect(showInfoDialog) {
 		if (showInfoDialog) {
 			withContext(Dispatchers.IO) {
@@ -812,13 +800,11 @@ fun AudioPlayerView(
 			currentIndex = index
 		}
 	}
-
 	LaunchedEffect(playlist.uris.size) {
 		if (playlist.uris.isNotEmpty() && exoPlayer.currentMediaItem == null) {
 			playIndex(currentIndex, play = false)
 		}
 	}
-
 	LaunchedEffect(isPlaying) {
 		if (isPlaying && isInitialPlayback && playlist.lastPosition > 0f) {
 			val dur = exoPlayer.duration
@@ -829,7 +815,6 @@ fun AudioPlayerView(
 		}
 		onPlayStateChanged(isPlaying)
 	}
-
 	LaunchedEffect(currentIndex, isPlaying) {
 		while (isPlaying) {
 			val pos = exoPlayer.currentPosition
@@ -840,25 +825,23 @@ fun AudioPlayerView(
 			kotlinx.coroutines.delay(500)
 		}
 	}
-
 	LaunchedEffect(currentIndex, isPlaying) {
 		while (isPlaying) {
 			kotlinx.coroutines.delay(5000)
 			onProgressUpdate(currentIndex, progress)
 		}
 	}
-
 	DisposableEffect(currentIndex) {
 		onDispose {
 			onProgressUpdate(currentIndex, progress)
 		}
 	}
-
 	DisposableEffect(Unit) {
 		val listener = object : Player.Listener {
 			override fun onIsPlayingChanged(isPlayingChanged: Boolean) {
 				isPlaying = isPlayingChanged
 			}
+
 			override fun onPlaybackStateChanged(playbackState: Int) {
 				if (playbackState == Player.STATE_ENDED) {
 					if (currentIndex < playlist.uris.size - 1) {
@@ -873,7 +856,6 @@ fun AudioPlayerView(
 			exoPlayer.release()
 		}
 	}
-
 	Column(modifier = modifier) {
 		LazyColumn(modifier = Modifier.weight(1f)) {
 			items(playlist.uris.size) { index ->
@@ -942,7 +924,6 @@ fun AudioPlayerView(
 				)
 			}
 		}
-
 		Surface(shadowElevation = 8.dp) {
 			Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
 				Text(
@@ -1052,7 +1033,6 @@ fun AudioPlayerView(
 			}
 		}
 	}
-
 	if (showSearchDialog) {
 		AlertDialog(
 			modifier = Modifier.semantics { paneTitle = "Search Track" },
@@ -1069,7 +1049,6 @@ fun AudioPlayerView(
 					Spacer(Modifier.height(8.dp))
 					val filteredTracks = playlist.uris.mapIndexed { index, uri -> index to uri }
 						.filter { it.second.lastPathSegment?.contains(searchQuery, ignoreCase = true) == true }
-
 					LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
 						items(filteredTracks) { (index, uri) ->
 							ListItem(
@@ -1089,7 +1068,6 @@ fun AudioPlayerView(
 			}
 		)
 	}
-
 	if (showInfoDialog) {
 		AlertDialog(
 			modifier = Modifier.semantics { paneTitle = "Playlist Info" },

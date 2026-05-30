@@ -1,5 +1,4 @@
 package com.boostofstudios.fukex
-
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.clickable
@@ -21,7 +20,6 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import com.boostofstudios.fukex.data.LockTimeout
 import com.boostofstudios.fukex.data.SettingsManager
-
 import android.content.Context
 import android.content.ContextWrapper
 
@@ -52,10 +50,16 @@ fun SettingsScreen(
 			isBiometricEnabled = false
 			return
 		}
-
+		val biometricManager = BiometricManager.from(context)
+		val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+		if (biometricManager.canAuthenticate(authenticators) != BiometricManager.BIOMETRIC_SUCCESS) {
+			android.widget.Toast.makeText(context, "Biometric authentication is not available or not set up on this device.", android.widget.Toast.LENGTH_LONG).show()
+			return
+		}
 		val fragmentActivity = activity ?: return
 		val executor = ContextCompat.getMainExecutor(context)
 		val biometricPrompt = BiometricPrompt(fragmentActivity, executor,
+
 			object : BiometricPrompt.AuthenticationCallback() {
 				override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
 					super.onAuthenticationSucceeded(result)
@@ -63,16 +67,13 @@ fun SettingsScreen(
 					isBiometricEnabled = true
 				}
 			})
-
 		val promptInfo = BiometricPrompt.PromptInfo.Builder()
 			.setTitle("Biometric Authentication")
 			.setSubtitle("Authenticate to enable biometric unlock")
 			.setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL)
 			.build()
-
 		biometricPrompt.authenticate(promptInfo)
 	}
-
 	Scaffold(
 		topBar = {
 			TopAppBar(
@@ -99,7 +100,6 @@ fun SettingsScreen(
 					checked = isBiometricEnabled,
 					onCheckedChange = { authenticateAndEnableBiometrics(it) }
 				)
-				
 				ListItem(
 					headlineContent = { Text("Lock Timeout") },
 					supportingContent = { Text("Automatically lock playlists after: ${lockTimeout.label}") },
@@ -107,7 +107,6 @@ fun SettingsScreen(
 					modifier = Modifier.clickable { showTimeoutDialog = true }
 				)
 			}
-
 			item {
 				SettingsHeader("Playback")
 				SettingsToggleItem(
@@ -121,7 +120,6 @@ fun SettingsScreen(
 					}
 				)
 			}
-
 			item {
 				SettingsHeader("About")
 				ListItem(
@@ -135,7 +133,6 @@ fun SettingsScreen(
 			}
 		}
 	}
-
 	if (showTimeoutDialog) {
 		AlertDialog(
 			onDismissRequest = { showTimeoutDialog = false },
