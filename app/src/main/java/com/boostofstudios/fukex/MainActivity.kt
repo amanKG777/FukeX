@@ -66,6 +66,10 @@ import androidx.fragment.app.FragmentActivity
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
+import android.support.v4.media.session.MediaSessionCompat
+import android.support.v4.media.session.PlaybackStateCompat
+import android.support.v4.media.MediaMetadataCompat
+import android.app.PendingIntent
 import com.boostofstudios.fukex.data.LockTimeout
 import com.boostofstudios.fukex.data.SettingsManager
 import androidx.lifecycle.Lifecycle
@@ -847,6 +851,82 @@ fun AudioPlayerView(
 			playIndex(currentIndex, play = false)
 		}
 	}
+	val currentPlayIndex = rememberUpdatedState({ index: Int, play: Boolean -> playIndex(index, play) })
+	val currentCurrentIndex = rememberUpdatedState(currentIndex)
+	val currentPlaylistUrisSize = rememberUpdatedState(playlist.uris.size)
+
+	val mediaSession = remember {
+		MediaSessionCompat(context, "FukeXSession").apply {
+			val mediaButtonIntent = Intent(Intent.ACTION_MEDIA_BUTTON).apply {
+				setClass(context, androidx.media.session.MediaButtonReceiver::class.java)
+			}
+			val pendingIntent = PendingIntent.getBroadcast(
+				context, 0, mediaButtonIntent, PendingIntent.FLAG_IMMUTABLE
+			)
+			setMediaButtonReceiver(pendingIntent)
+			isActive = true
+		}
+	}
+
+	DisposableEffect(mediaSession) {
+		PlaybackService.activeMediaSession = mediaSession
+		mediaSession.setCallback(object : MediaSessionCompat.Callback() {
+			override fun onPlay() { exoPlayer.play() }
+			override fun onPause() { exoPlayer.pause() }
+			override fun onSkipToNext() {
+				val size = currentPlaylistUrisSize.value
+				val idx = currentCurrentIndex.value
+				if (idx < size - 1) {
+					currentPlayIndex.value.invoke(idx + 1, true)
+				}
+			}
+			override fun onSkipToPrevious() {
+				val idx = currentCurrentIndex.value
+				if (idx > 0) {
+					currentPlayIndex.value.invoke(idx - 1, true)
+				}
+			}
+		})
+		onDispose {
+			mediaSession.release()
+			PlaybackService.activeMediaSession = null
+			val stopIntent = Intent(context, PlaybackService::class.java).apply {
+				action = PlaybackService.ACTION_STOP
+			}
+			context.startService(stopIntent)
+		}
+	}
+
+	LaunchedEffect(isPlaying, currentIndex, playlist.uris) {
+		val state = if (isPlaying) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED
+		val playbackState = PlaybackStateCompat.Builder()
+			.setActions(
+				PlaybackStateCompat.ACTION_PLAY or 
+				PlaybackStateCompat.ACTION_PAUSE or 
+				PlaybackStateCompat.ACTION_PLAY_PAUSE or
+				PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
+				PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
+			).setState(state, PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, 1.0f)
+			.build()
+		mediaSession.setPlaybackState(playbackState)
+
+		val trackName = if (currentIndex in playlist.uris.indices) playlist.uris[currentIndex].lastPathSegment ?: "Track ${currentIndex + 1}" else "Unknown"
+		val metadata = MediaMetadataCompat.Builder()
+			.putString(MediaMetadataCompat.METADATA_KEY_TITLE, trackName)
+			.putString(MediaMetadataCompat.METADATA_KEY_ARTIST, playlist.name)
+			.build()
+		mediaSession.setMetadata(metadata)
+
+		if (isPlaying || PlaybackService.activeMediaSession != null) {
+			val intent = Intent(context, PlaybackService::class.java).apply {
+				putExtra(PlaybackService.EXTRA_IS_PLAYING, isPlaying)
+				putExtra(PlaybackService.EXTRA_TITLE, trackName)
+				putExtra(PlaybackService.EXTRA_AUTHOR, playlist.name)
+			}
+			ContextCompat.startForegroundService(context, intent)
+		}
+	}
+
 	LaunchedEffect(isPlaying) {
 		if (isPlaying && isInitialPlayback && playlist.lastPosition > 0f) {
 			val dur = exoPlayer.duration
