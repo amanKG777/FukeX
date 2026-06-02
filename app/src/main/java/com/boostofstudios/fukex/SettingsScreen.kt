@@ -38,6 +38,7 @@ fun Context.findActivity(): FragmentActivity? {
 fun SettingsScreen(
 	onBack: () -> Unit
 ) {
+	androidx.activity.compose.BackHandler(onBack = onBack)
 	val context = LocalContext.current
 	val activity = remember(context) { context.findActivity() }
 	var isBiometricEnabled by remember { mutableStateOf(SettingsManager.isBiometricEnabled(context)) }

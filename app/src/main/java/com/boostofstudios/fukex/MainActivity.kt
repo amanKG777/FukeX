@@ -169,7 +169,25 @@ fun MainScreen(modifier: Modifier = Modifier) {
 			.build()
 		biometricPrompt.authenticate(promptInfo)
 	}
+	val permissionsLauncher = rememberLauncherForActivityResult(
+		contract = ActivityResultContracts.RequestMultiplePermissions()
+	) {}
 	LaunchedEffect(Unit) {
+		val permsToRequest = mutableListOf<String>()
+		if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+			if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+				permsToRequest.add(android.Manifest.permission.POST_NOTIFICATIONS)
+			}
+		}
+		if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.R) {
+			if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_EXTERNAL_STORAGE) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+				permsToRequest.add(android.Manifest.permission.READ_EXTERNAL_STORAGE)
+			}
+		}
+		if (permsToRequest.isNotEmpty()) {
+			permissionsLauncher.launch(permsToRequest.toTypedArray())
+		}
+		
 		if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
 			if (!android.os.Environment.isExternalStorageManager()) {
 				val intent = Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
@@ -783,7 +801,15 @@ fun AudioPlayerView(
 	onUpdatePlaylist: (Playlist) -> Unit
 ) {
 	val context = LocalContext.current
-	val exoPlayer = remember { ExoPlayer.Builder(context).build() }
+	val exoPlayer = remember { 
+		val audioAttributes = androidx.media3.common.AudioAttributes.Builder()
+			.setUsage(C.USAGE_MEDIA)
+			.setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+			.build()
+		ExoPlayer.Builder(context)
+			.setAudioAttributes(audioAttributes, true)
+			.build()
+	}
 	var currentIndex by remember { mutableIntStateOf(playlist.lastIndex) }
 	var isPlaying by remember { mutableStateOf(false) }
 	var progress by remember { mutableFloatStateOf(0f) }
@@ -796,13 +822,27 @@ fun AudioPlayerView(
 	var searchQuery by remember { mutableStateOf("") }
 	var playlistSize by remember { mutableLongStateOf(0L) }
 	var amplifierEnabled by remember { mutableStateOf(SettingsManager.isAmplifierEnabled(context)) }
-	val amplifierLevel = remember { SettingsManager.getAmplifierLevel(context) }
+	var amplifierLevel by remember { mutableIntStateOf(SettingsManager.getAmplifierLevel(context)) }
 	var loudnessEnhancer by remember { mutableStateOf<LoudnessEnhancer?>(null) }
+	
+	DisposableEffect(context) {
+		val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+			if (key == "amplifier_enabled") {
+				amplifierEnabled = SettingsManager.isAmplifierEnabled(context)
+			} else if (key == "amplifier_level") {
+				amplifierLevel = SettingsManager.getAmplifierLevel(context)
+			}
+		}
+		SettingsManager.registerChangeListener(context, listener)
+		onDispose {
+			SettingsManager.unregisterChangeListener(context, listener)
+		}
+	}
 
 	fun updateAmplifier(sessionId: Int) {
 		try {
 			loudnessEnhancer?.release()
-			if (amplifierEnabled && sessionId != C.AUDIO_SESSION_ID_UNSET) {
+			if (amplifierEnabled && sessionId != C.AUDIO_SESSION_ID_UNSET && sessionId != 0) {
 				loudnessEnhancer = LoudnessEnhancer(sessionId).apply {
 					setTargetGain(amplifierLevel)
 					enabled = true
@@ -812,10 +852,11 @@ fun AudioPlayerView(
 			}
 		} catch (e: Exception) {
 			e.printStackTrace()
+			loudnessEnhancer = null
 		}
 	}
 
-	LaunchedEffect(amplifierEnabled) {
+	LaunchedEffect(amplifierEnabled, amplifierLevel) {
 		updateAmplifier(exoPlayer.audioSessionId)
 	}
 

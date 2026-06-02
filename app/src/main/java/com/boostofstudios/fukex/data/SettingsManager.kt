@@ -17,8 +17,16 @@ object SettingsManager {
     private const val KEY_AMPLIFIER_LEVEL = "amplifier_level"
     private const val KEY_AMPLIFIER_ENABLED = "amplifier_enabled"
 
-    private fun getPrefs(context: Context): SharedPreferences {
+    fun getPrefs(context: Context): SharedPreferences {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    }
+
+    fun registerChangeListener(context: Context, listener: SharedPreferences.OnSharedPreferenceChangeListener) {
+        getPrefs(context).registerOnSharedPreferenceChangeListener(listener)
+    }
+
+    fun unregisterChangeListener(context: Context, listener: SharedPreferences.OnSharedPreferenceChangeListener) {
+        getPrefs(context).unregisterOnSharedPreferenceChangeListener(listener)
     }
 
     fun getAmplifierLevel(context: Context): Int {
