@@ -187,7 +187,6 @@ fun MainScreen(modifier: Modifier = Modifier) {
 		if (permsToRequest.isNotEmpty()) {
 			permissionsLauncher.launch(permsToRequest.toTypedArray())
 		}
-		
 		if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
 			if (!android.os.Environment.isExternalStorageManager()) {
 				val intent = Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
@@ -287,8 +286,9 @@ fun MainScreen(modifier: Modifier = Modifier) {
 		if (isScanning) {
 			LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
 		}
+		val safeSelectedTabIndex = kotlin.math.min(selectedTabIndex, visiblePlaylists.lastIndex).coerceAtLeast(0)
 		ScrollableTabRow(
-			selectedTabIndex = selectedTabIndex,
+			selectedTabIndex = safeSelectedTabIndex,
 			edgePadding = 16.dp,
 			modifier = Modifier.fillMaxWidth(),
 			indicator = { tabPositions ->
@@ -824,7 +824,6 @@ fun AudioPlayerView(
 	var amplifierEnabled by remember { mutableStateOf(SettingsManager.isAmplifierEnabled(context)) }
 	var amplifierLevel by remember { mutableIntStateOf(SettingsManager.getAmplifierLevel(context)) }
 	var loudnessEnhancer by remember { mutableStateOf<LoudnessEnhancer?>(null) }
-	
 	DisposableEffect(context) {
 		val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
 			if (key == "amplifier_enabled") {
@@ -855,11 +854,9 @@ fun AudioPlayerView(
 			loudnessEnhancer = null
 		}
 	}
-
 	LaunchedEffect(amplifierEnabled, amplifierLevel) {
 		updateAmplifier(exoPlayer.audioSessionId)
 	}
-
 	LaunchedEffect(showInfoDialog) {
 		if (showInfoDialog) {
 			withContext(Dispatchers.IO) {
@@ -895,7 +892,6 @@ fun AudioPlayerView(
 	val currentPlayIndex = rememberUpdatedState({ index: Int, play: Boolean -> playIndex(index, play) })
 	val currentCurrentIndex = rememberUpdatedState(currentIndex)
 	val currentPlaylistUrisSize = rememberUpdatedState(playlist.uris.size)
-
 	val mediaSession = remember {
 		MediaSessionCompat(context, "FukeXSession").apply {
 			val mediaButtonIntent = Intent(Intent.ACTION_MEDIA_BUTTON).apply {
@@ -908,12 +904,13 @@ fun AudioPlayerView(
 			isActive = true
 		}
 	}
-
 	DisposableEffect(mediaSession) {
 		PlaybackService.activeMediaSession = mediaSession
 		mediaSession.setCallback(object : MediaSessionCompat.Callback() {
 			override fun onPlay() { exoPlayer.play() }
+
 			override fun onPause() { exoPlayer.pause() }
+
 			override fun onSkipToNext() {
 				val size = currentPlaylistUrisSize.value
 				val idx = currentCurrentIndex.value
@@ -921,6 +918,7 @@ fun AudioPlayerView(
 					currentPlayIndex.value.invoke(idx + 1, true)
 				}
 			}
+
 			override fun onSkipToPrevious() {
 				val idx = currentCurrentIndex.value
 				if (idx > 0) {
@@ -937,7 +935,6 @@ fun AudioPlayerView(
 			context.startService(stopIntent)
 		}
 	}
-
 	LaunchedEffect(isPlaying, currentIndex, playlist.uris) {
 		val state = if (isPlaying) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED
 		val playbackState = PlaybackStateCompat.Builder()
@@ -950,14 +947,12 @@ fun AudioPlayerView(
 			).setState(state, PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, 1.0f)
 			.build()
 		mediaSession.setPlaybackState(playbackState)
-
 		val trackName = if (currentIndex in playlist.uris.indices) playlist.uris[currentIndex].lastPathSegment ?: "Track ${currentIndex + 1}" else "Unknown"
 		val metadata = MediaMetadataCompat.Builder()
 			.putString(MediaMetadataCompat.METADATA_KEY_TITLE, trackName)
 			.putString(MediaMetadataCompat.METADATA_KEY_ARTIST, playlist.name)
 			.build()
 		mediaSession.setMetadata(metadata)
-
 		if (isPlaying || PlaybackService.activeMediaSession != null) {
 			val intent = Intent(context, PlaybackService::class.java).apply {
 				putExtra(PlaybackService.EXTRA_IS_PLAYING, isPlaying)
@@ -967,7 +962,6 @@ fun AudioPlayerView(
 			ContextCompat.startForegroundService(context, intent)
 		}
 	}
-
 	LaunchedEffect(isPlaying) {
 		if (isPlaying && isInitialPlayback && playlist.lastPosition > 0f) {
 			val dur = exoPlayer.duration

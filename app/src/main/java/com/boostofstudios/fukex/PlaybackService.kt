@@ -1,5 +1,4 @@
 package com.boostofstudios.fukex
-
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -13,11 +12,9 @@ import android.support.v4.media.session.MediaSessionCompat
 import androidx.core.app.NotificationCompat
 
 class PlaybackService : Service() {
-
     companion object {
         const val CHANNEL_ID = "fukex_playback_channel"
         const val NOTIFICATION_ID = 1
-
         const val ACTION_PLAY = "com.boostofstudios.fukex.ACTION_PLAY"
         const val ACTION_PAUSE = "com.boostofstudios.fukex.ACTION_PAUSE"
         const val ACTION_NEXT = "com.boostofstudios.fukex.ACTION_NEXT"
@@ -26,7 +23,6 @@ class PlaybackService : Service() {
         const val EXTRA_IS_PLAYING = "EXTRA_IS_PLAYING"
         const val EXTRA_TITLE = "EXTRA_TITLE"
         const val EXTRA_AUTHOR = "EXTRA_AUTHOR"
-
         var activeMediaSession: MediaSessionCompat? = null
     }
 
@@ -37,45 +33,37 @@ class PlaybackService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent == null) return START_NOT_STICKY
-
         if (intent.action == Intent.ACTION_MEDIA_BUTTON) {
-            activeMediaSession?.let { session ->
+            activeMediaSession?.takeIf { it.isActive }?.let { session ->
                 androidx.media.session.MediaButtonReceiver.handleIntent(session, intent)
             }
         } else when (intent.action) {
-            ACTION_PLAY -> activeMediaSession?.controller?.transportControls?.play()
-            ACTION_PAUSE -> activeMediaSession?.controller?.transportControls?.pause()
-            ACTION_NEXT -> activeMediaSession?.controller?.transportControls?.skipToNext()
-            ACTION_PREV -> activeMediaSession?.controller?.transportControls?.skipToPrevious()
+            ACTION_PLAY -> activeMediaSession?.takeIf { it.isActive }?.controller?.transportControls?.play()
+            ACTION_PAUSE -> activeMediaSession?.takeIf { it.isActive }?.controller?.transportControls?.pause()
+            ACTION_NEXT -> activeMediaSession?.takeIf { it.isActive }?.controller?.transportControls?.skipToNext()
+            ACTION_PREV -> activeMediaSession?.takeIf { it.isActive }?.controller?.transportControls?.skipToPrevious()
             ACTION_STOP -> {
-                activeMediaSession?.controller?.transportControls?.stop()
+                activeMediaSession?.takeIf { it.isActive }?.controller?.transportControls?.stop()
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
                 return START_NOT_STICKY
             }
         }
-
-        val isPlaying = intent.getBooleanExtra(EXTRA_IS_PLAYING, activeMediaSession?.controller?.playbackState?.state == android.support.v4.media.session.PlaybackStateCompat.STATE_PLAYING)
-        
-        val sessionTitle = activeMediaSession?.controller?.metadata?.getString(android.support.v4.media.MediaMetadataCompat.METADATA_KEY_TITLE)
-        val sessionAuthor = activeMediaSession?.controller?.metadata?.getString(android.support.v4.media.MediaMetadataCompat.METADATA_KEY_ARTIST)
-
+        val isPlaying = try { intent.getBooleanExtra(EXTRA_IS_PLAYING, activeMediaSession?.takeIf { it.isActive }?.controller?.playbackState?.state == android.support.v4.media.session.PlaybackStateCompat.STATE_PLAYING) } catch (e: Exception) { false }
+        val sessionTitle = try { activeMediaSession?.takeIf { it.isActive }?.controller?.metadata?.getString(android.support.v4.media.MediaMetadataCompat.METADATA_KEY_TITLE) } catch (e: Exception) { null }
+        val sessionAuthor = try { activeMediaSession?.takeIf { it.isActive }?.controller?.metadata?.getString(android.support.v4.media.MediaMetadataCompat.METADATA_KEY_ARTIST) } catch (e: Exception) { null }
         val title = intent.getStringExtra(EXTRA_TITLE)?.takeIf { it.isNotBlank() } 
             ?: sessionTitle?.takeIf { it.isNotBlank() } 
             ?: "FukeX"
-            
         val author = intent.getStringExtra(EXTRA_AUTHOR)?.takeIf { it.isNotBlank() } 
             ?: sessionAuthor?.takeIf { it.isNotBlank() } 
             ?: "Unknown"
-
         val notification = buildNotification(isPlaying, title, author)
-        
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
         } else {
             startForeground(NOTIFICATION_ID, notification)
         }
-
         if (!isPlaying) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 stopForeground(STOP_FOREGROUND_DETACH)
@@ -84,7 +72,6 @@ class PlaybackService : Service() {
                 stopForeground(false)
             }
         }
-
         return START_STICKY
     }
 
@@ -93,7 +80,6 @@ class PlaybackService : Service() {
         val pendingMainIntent = PendingIntent.getActivity(
             this, 0, mainIntent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
-
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_media_play) // Fallback icon
             .setContentTitle(title)
@@ -101,13 +87,11 @@ class PlaybackService : Service() {
             .setContentIntent(pendingMainIntent)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(isPlaying)
-
         // Add Media actions
         builder.addAction(
             android.R.drawable.ic_media_previous, "Previous",
             PendingIntent.getService(this, 1, Intent(this, PlaybackService::class.java).setAction(ACTION_PREV), PendingIntent.FLAG_IMMUTABLE)
         )
-
         if (isPlaying) {
             builder.addAction(
                 android.R.drawable.ic_media_pause, "Pause",
@@ -119,19 +103,16 @@ class PlaybackService : Service() {
                 PendingIntent.getService(this, 2, Intent(this, PlaybackService::class.java).setAction(ACTION_PLAY), PendingIntent.FLAG_IMMUTABLE)
             )
         }
-
         builder.addAction(
             android.R.drawable.ic_media_next, "Next",
             PendingIntent.getService(this, 3, Intent(this, PlaybackService::class.java).setAction(ACTION_NEXT), PendingIntent.FLAG_IMMUTABLE)
         )
-
-        activeMediaSession?.sessionToken?.let { token ->
+        activeMediaSession?.takeIf { it.isActive }?.sessionToken?.let { token ->
             val mediaStyle = androidx.media.app.NotificationCompat.MediaStyle()
                 .setShowActionsInCompactView(0, 1, 2)
                 .setMediaSession(token)
             builder.setStyle(mediaStyle)
         }
-
         return builder.build()
     }
 
