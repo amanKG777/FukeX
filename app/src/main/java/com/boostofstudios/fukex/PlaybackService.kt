@@ -44,6 +44,19 @@ class PlaybackService : Service() {
             ACTION_PREV -> activeMediaSession?.takeIf { it.isActive }?.controller?.transportControls?.skipToPrevious()
             ACTION_STOP -> {
                 activeMediaSession?.takeIf { it.isActive }?.controller?.transportControls?.stop()
+                
+                // Call startForeground with a dummy/empty notification to satisfy the foreground contract
+                // before stopping, just in case this intent was delivered after a startForegroundService call
+                // but before startForeground was called, or if the system gets confused.
+                val title = try { activeMediaSession?.takeIf { it.isActive }?.controller?.metadata?.getString(android.support.v4.media.MediaMetadataCompat.METADATA_KEY_TITLE) } catch (e: Exception) { null } ?: "FukeX"
+                val author = try { activeMediaSession?.takeIf { it.isActive }?.controller?.metadata?.getString(android.support.v4.media.MediaMetadataCompat.METADATA_KEY_ARTIST) } catch (e: Exception) { null } ?: "Unknown"
+                val notification = buildNotification(false, title, author)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    startForeground(NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+                } else {
+                    startForeground(NOTIFICATION_ID, notification)
+                }
+                
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
                 return START_NOT_STICKY
