@@ -831,11 +831,13 @@ fun AudioPlayerView(
 	val context = LocalContext.current
 	val exoPlayer = remember { 
 		val audioAttributes = androidx.media3.common.AudioAttributes.Builder()
-			.setUsage(C.USAGE_MEDIA)
-			.setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+			.setUsage(androidx.media3.common.C.USAGE_MEDIA)
+			.setContentType(androidx.media3.common.C.AUDIO_CONTENT_TYPE_MUSIC)
 			.build()
-		ExoPlayer.Builder(context)
+		androidx.media3.exoplayer.ExoPlayer.Builder(context)
 			.setAudioAttributes(audioAttributes, true)
+			.setHandleAudioBecomingNoisy(true)
+			.setSkipSilenceEnabled(true)
 			.build()
 	}
 	var currentIndex by remember { mutableIntStateOf(playlist.lastIndex) }
@@ -1043,12 +1045,10 @@ fun AudioPlayerView(
 				isPlaying = isPlayingChanged
 			}
 
-			override fun onPlaybackStateChanged(playbackState: Int) {
-				if (playbackState == Player.STATE_ENDED) {
-					if (currentIndex < playlist.uris.size - 1) {
-						currentIndex++
-						playIndex(currentIndex)
-					}
+			override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+				val newIndex = exoPlayer.currentMediaItemIndex
+				if (currentIndex != newIndex) {
+					currentIndex = newIndex
 				}
 			}
 
@@ -1274,7 +1274,6 @@ fun AudioPlayerView(
 							ListItem(
 								headlineContent = { Text(uri.lastPathSegment ?: "Track ${index + 1}") },
 								modifier = Modifier.clickable {
-									currentIndex = index
 									playIndex(index)
 									showSearchDialog = false
 									searchQuery = ""
