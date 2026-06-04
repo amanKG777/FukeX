@@ -43,11 +43,18 @@ fun SettingsScreen(
 	val activity = remember(context) { context.findActivity() }
 	var isBiometricEnabled by remember { mutableStateOf(SettingsManager.isBiometricEnabled(context)) }
 	var isBackgroundPlaybackEnabled by remember { mutableStateOf(SettingsManager.isBackgroundPlaybackEnabled(context)) }
+	var isExitPromptEnabled by remember { mutableStateOf(SettingsManager.isExitPromptEnabled(context)) }
 	var lockTimeout by remember { mutableStateOf(SettingsManager.getLockTimeout(context)) }
 	var showTimeoutDialog by remember { mutableStateOf(false) }
+	var showAboutScreen by remember { mutableStateOf(false) }
 	var amplifierLevel by remember { mutableIntStateOf(SettingsManager.getAmplifierLevel(context)) }
 	var showAmplifierWarning by remember { mutableStateOf(false) }
 	var pendingAmplifierLevel by remember { mutableIntStateOf(0) }
+
+	if (showAboutScreen) {
+		AboutScreen(onBack = { showAboutScreen = false })
+		return
+	}
 
 	fun authenticateAndEnableBiometrics(enabled: Boolean) {
 		if (!enabled) {
@@ -111,6 +118,16 @@ fun SettingsScreen(
 					leadingContent = { Icon(Icons.Default.LockClock, null) },
 					modifier = Modifier.clickable { showTimeoutDialog = true }
 				)
+				SettingsToggleItem(
+					title = "Exit Prompt",
+					subtitle = "Show confirmation dialog when closing app",
+					icon = Icons.Default.Info,
+					checked = isExitPromptEnabled,
+					onCheckedChange = { 
+						SettingsManager.setExitPromptEnabled(context, it)
+						isExitPromptEnabled = it 
+					}
+				)
 			}
 			item {
 				SettingsHeader("Playback")
@@ -156,12 +173,10 @@ fun SettingsScreen(
 			item {
 				SettingsHeader("About")
 				ListItem(
-					headlineContent = { Text("Version") },
-					supportingContent = { Text("1.0.0") },
+					headlineContent = { Text("About FukeX") },
+					supportingContent = { Text("Version 0.0.1, Copyright info, and license") },
 					leadingContent = { Icon(Icons.Default.Info, null) },
-					modifier = Modifier.semantics { 
-						role = Role.Button
-					}
+					modifier = Modifier.clickable { showAboutScreen = true }
 				)
 			}
 		}
@@ -213,6 +228,43 @@ fun SettingsScreen(
 				TextButton(onClick = { showAmplifierWarning = false }) { Text("Cancel") }
 			}
 		)
+	}
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AboutScreen(onBack: () -> Unit) {
+	androidx.activity.compose.BackHandler(onBack = onBack)
+	Scaffold(
+		topBar = {
+			TopAppBar(
+				title = { Text("About FukeX") },
+				navigationIcon = {
+					IconButton(onClick = onBack) {
+						Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to settings")
+					}
+				}
+			)
+		}
+	) { padding ->
+		Column(
+			modifier = Modifier
+				.fillMaxSize()
+				.padding(padding)
+				.padding(16.dp),
+			verticalArrangement = Arrangement.spacedBy(16.dp)
+		) {
+			Text("FukeX version 0.0.1", style = MaterialTheme.typography.headlineMedium)
+			HorizontalDivider()
+			Text(
+				"Copyright (C) This project is copyrighted under the BoostOf Studios Creation Copyright 2026",
+				style = MaterialTheme.typography.bodyLarge
+			)
+			Text(
+				"This project is licensed under the MIT License.",
+				style = MaterialTheme.typography.bodyMedium
+			)
+		}
 	}
 }
 

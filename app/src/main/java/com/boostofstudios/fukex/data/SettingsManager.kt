@@ -16,6 +16,7 @@ object SettingsManager {
     private const val KEY_LOCK_TIMEOUT = "lock_timeout"
     private const val KEY_AMPLIFIER_LEVEL = "amplifier_level"
     private const val KEY_AMPLIFIER_ENABLED = "amplifier_enabled"
+    private const val KEY_EXIT_PROMPT = "exit_prompt"
 
     fun getPrefs(context: Context): SharedPreferences {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -27,6 +28,14 @@ object SettingsManager {
 
     fun unregisterChangeListener(context: Context, listener: SharedPreferences.OnSharedPreferenceChangeListener) {
         getPrefs(context).unregisterOnSharedPreferenceChangeListener(listener)
+    }
+
+    fun isExitPromptEnabled(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_EXIT_PROMPT, false)
+    }
+
+    fun setExitPromptEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_EXIT_PROMPT, enabled).apply()
     }
 
     fun getAmplifierLevel(context: Context): Int {

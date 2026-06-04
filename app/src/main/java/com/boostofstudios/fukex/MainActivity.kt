@@ -113,9 +113,37 @@ fun MainScreen(modifier: Modifier = Modifier) {
 	var authError by remember { mutableStateOf("") }
 	var showFilePicker by remember { mutableStateOf(false) }
 	var showSettings by remember { mutableStateOf(false) }
+	var showExitDialog by remember { mutableStateOf(false) }
 	var lastActiveTimes by remember { mutableStateOf(mapOf<String, Long>()) }
 	var currentlyPlayingPlaylistId by remember { mutableStateOf<String?>(null) }
 	val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+
+	androidx.activity.compose.BackHandler(enabled = !showSettings && !showFilePicker && !showNameDialog) {
+		if (SettingsManager.isExitPromptEnabled(context)) {
+			showExitDialog = true
+		} else {
+			(context as? MainActivity)?.finish()
+		}
+	}
+
+	if (showExitDialog) {
+		AlertDialog(
+			onDismissRequest = { showExitDialog = false },
+			title = { Text("Exit FukeX") },
+			text = { Text("Do you really wanna quit?") },
+			confirmButton = {
+				Button(onClick = { (context as? MainActivity)?.finish() }) {
+					Text("Yes")
+				}
+			},
+			dismissButton = {
+				TextButton(onClick = { showExitDialog = false }) {
+					Text("No")
+				}
+			}
+		)
+	}
+
 	LaunchedEffect(unlockedPlaylistIds, currentlyPlayingPlaylistId, lastActiveTimes) {
 		while (true) {
 			kotlinx.coroutines.delay(10000) // Check every 10 seconds
@@ -824,6 +852,22 @@ fun AudioPlayerView(
 	var amplifierEnabled by remember { mutableStateOf(SettingsManager.isAmplifierEnabled(context)) }
 	var amplifierLevel by remember { mutableIntStateOf(SettingsManager.getAmplifierLevel(context)) }
 	var loudnessEnhancer by remember { mutableStateOf<LoudnessEnhancer?>(null) }
+
+	val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+	DisposableEffect(lifecycleOwner) {
+		val observer = LifecycleEventObserver { _, event ->
+			if (event == Lifecycle.Event.ON_STOP) {
+				if (!SettingsManager.isBackgroundPlaybackEnabled(context)) {
+					exoPlayer.pause()
+				}
+			}
+		}
+		lifecycleOwner.lifecycle.addObserver(observer)
+		onDispose {
+			lifecycleOwner.lifecycle.removeObserver(observer)
+		}
+	}
+
 	DisposableEffect(context) {
 		val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
 			if (key == "amplifier_enabled") {
@@ -1231,6 +1275,7 @@ fun AudioPlayerView(
 								headlineContent = { Text(uri.lastPathSegment ?: "Track ${index + 1}") },
 								modifier = Modifier.clickable {
 									currentIndex = index
+									playIndex(index)
 									showSearchDialog = false
 									searchQuery = ""
 								}
