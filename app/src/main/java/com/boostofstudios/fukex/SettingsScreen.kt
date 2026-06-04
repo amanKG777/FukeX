@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LockClock
 import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -50,6 +51,10 @@ fun SettingsScreen(
 	var amplifierLevel by remember { mutableIntStateOf(SettingsManager.getAmplifierLevel(context)) }
 	var showAmplifierWarning by remember { mutableStateOf(false) }
 	var pendingAmplifierLevel by remember { mutableIntStateOf(0) }
+	var fadeOnSeek by remember { mutableIntStateOf(SettingsManager.getFadeOnSeek(context)) }
+	var fadeOnPause by remember { mutableIntStateOf(SettingsManager.getFadeOnPause(context)) }
+	var fadeOnManual by remember { mutableIntStateOf(SettingsManager.getFadeOnManual(context)) }
+	var fadeOnAuto by remember { mutableIntStateOf(SettingsManager.getFadeOnAuto(context)) }
 
 	if (showAboutScreen) {
 		AboutScreen(onBack = { showAboutScreen = false })
@@ -142,6 +147,7 @@ fun SettingsScreen(
 					}
 				)
 				ListItem(
+					modifier = Modifier.semantics(mergeDescendants = true) {},
 					headlineContent = { Text("Amplifier Boost: ${amplifierLevel / 100} dB") },
 					supportingContent = {
 						Column {
@@ -168,6 +174,41 @@ fun SettingsScreen(
 						}
 					},
 					leadingContent = { Icon(Icons.AutoMirrored.Filled.VolumeUp, null) }
+				)
+			}
+			item {
+				SettingsHeader("Fading (Gapless Playback)")
+				FadeSliderItem(
+					title = "Fade on Seek",
+					msValue = fadeOnSeek,
+					onValueChange = {
+						fadeOnSeek = it
+						SettingsManager.setFadeOnSeek(context, it)
+					}
+				)
+				FadeSliderItem(
+					title = "Fade on Pause/Play",
+					msValue = fadeOnPause,
+					onValueChange = {
+						fadeOnPause = it
+						SettingsManager.setFadeOnPause(context, it)
+					}
+				)
+				FadeSliderItem(
+					title = "Fade on Manual Track Change",
+					msValue = fadeOnManual,
+					onValueChange = {
+						fadeOnManual = it
+						SettingsManager.setFadeOnManual(context, it)
+					}
+				)
+				FadeSliderItem(
+					title = "Fade on Automatic Track Change",
+					msValue = fadeOnAuto,
+					onValueChange = {
+						fadeOnAuto = it
+						SettingsManager.setFadeOnAuto(context, it)
+					}
 				)
 			}
 			item {
@@ -304,5 +345,27 @@ fun SettingsToggleItem(
 				stateDescription = if (checked) "Enabled" else "Disabled"
 				role = Role.Switch
 			}
+	)
+}
+
+@Composable
+fun FadeSliderItem(title: String, msValue: Int, onValueChange: (Int) -> Unit) {
+	ListItem(modifier = Modifier.semantics(mergeDescendants = true) {},
+		headlineContent = { Text(title) },
+		supportingContent = {
+			Column {
+				Text(if (msValue == 0) "Disabled" else "$msValue ms")
+				Slider(
+					value = msValue.toFloat(),
+					onValueChange = { onValueChange((Math.round(it / 500f) * 500)) },
+					valueRange = 0f..10000f,
+					modifier = Modifier.fillMaxWidth().semantics {
+						contentDescription = "$title slider"
+						stateDescription = "$msValue milliseconds"
+					}
+				)
+			}
+		},
+		leadingContent = { Icon(Icons.Default.GraphicEq, null) }
 	)
 }

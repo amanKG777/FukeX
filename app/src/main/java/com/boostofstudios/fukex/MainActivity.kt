@@ -921,18 +921,99 @@ fun AudioPlayerView(
 		}
 	}
 
+	var fadeOutAnimator by remember { mutableStateOf<android.animation.ValueAnimator?>(null) }
+
+	fun startVolumeAnimation(player: ExoPlayer, from: Float, to: Float, durationMs: Long, onEnd: () -> Unit = {}) {
+		fadeOutAnimator?.cancel()
+		if (durationMs <= 0) {
+			player.volume = to
+			onEnd()
+			return
+		}
+		val animator = android.animation.ValueAnimator.ofFloat(from, to).apply {
+			duration = durationMs
+			addUpdateListener { player.volume = it.animatedValue as Float }
+			addListener(object : android.animation.AnimatorListenerAdapter() {
+				override fun onAnimationEnd(animation: android.animation.Animator) {
+					onEnd()
+				}
+			})
+			start()
+		}
+		fadeOutAnimator = animator
+	}
+
 	fun playIndex(index: Int, play: Boolean = true) {
 		if (index in playlist.uris.indices) {
-			val uri = playlist.uris[index]
-			exoPlayer.setMediaItem(MediaItem.fromUri(uri))
-			exoPlayer.prepare()
-			if (play) exoPlayer.playWhenReady = true
-			currentIndex = index
+			val fadeManual = SettingsManager.getFadeOnManual(context).toLong()
+			val startPlayback = {
+				exoPlayer.seekTo(index, 0L)
+				if (play) {
+					exoPlayer.playWhenReady = true
+					startVolumeAnimation(exoPlayer, 0f, 1f, fadeManual)
+				} else {
+					exoPlayer.volume = 1f
+				}
+			}
+			
+			if (fadeManual > 0 && isPlaying) {
+				startVolumeAnimation(exoPlayer, exoPlayer.volume, 0f, fadeManual, startPlayback)
+			} else {
+				startPlayback()
+			}
 		}
 	}
-	LaunchedEffect(playlist.uris.size) {
-		if (playlist.uris.isNotEmpty() && exoPlayer.currentMediaItem == null) {
-			playIndex(currentIndex, play = false)
+
+	LaunchedEffect(playlist.uris) {
+		val items = playlist.uris.map { MediaItem.fromUri(it) }
+		if (items.isNotEmpty()) {
+			if (exoPlayer.mediaItemCount == 0) {
+				exoPlayer.setMediaItems(items)
+				exoPlayer.prepare()
+				if (currentIndex in items.indices) {
+					exoPlayer.seekTo(currentIndex, 0L)
+				}
+			} else {
+				val currentIdx = exoPlayer.currentMediaItemIndex
+				val currentPos = exoPlayer.currentPosition
+				exoPlayer.setMediaItems(items, currentIdx, currentPos)
+			}
+		} else {
+			exoPlayer.clearMediaItems()
+		}
+	}
+	
+	fun pausePlayback() {
+		val fadePause = SettingsManager.getFadeOnPause(context).toLong()
+		if (fadePause > 0 && isPlaying) {
+			startVolumeAnimation(exoPlayer, exoPlayer.volume, 0f, fadePause) {
+				exoPlayer.pause()
+			}
+		} else {
+			exoPlayer.pause()
+		}
+	}
+
+	fun startPlayback() {
+		val fadePause = SettingsManager.getFadeOnPause(context).toLong()
+		if (fadePause > 0) {
+			exoPlayer.play()
+			startVolumeAnimation(exoPlayer, 0f, 1f, fadePause)
+		} else {
+			exoPlayer.volume = 1f
+			exoPlayer.play()
+		}
+	}
+
+	fun seekToTime(pos: Long) {
+		val fadeSeek = SettingsManager.getFadeOnSeek(context).toLong()
+		if (fadeSeek > 0 && isPlaying) {
+			startVolumeAnimation(exoPlayer, exoPlayer.volume, 0f, fadeSeek) {
+				exoPlayer.seekTo(pos)
+				startVolumeAnimation(exoPlayer, 0f, 1f, fadeSeek)
+			}
+		} else {
+			exoPlayer.seekTo(pos)
 		}
 	}
 	val currentPlayIndex = rememberUpdatedState({ index: Int, play: Boolean -> playIndex(index, play) })
@@ -953,9 +1034,9 @@ fun AudioPlayerView(
 	DisposableEffect(mediaSession) {
 		PlaybackService.activeMediaSession = mediaSession
 		mediaSession.setCallback(object : MediaSessionCompat.Callback() {
-			override fun onPlay() { exoPlayer.play() }
+			override fun onPlay() { startPlayback() }
 
-			override fun onPause() { exoPlayer.pause() }
+			override fun onPause() { pausePlayback() }
 
 			override fun onSkipToNext() {
 				val size = currentPlaylistUrisSize.value
@@ -1018,13 +1099,20 @@ fun AudioPlayerView(
 		}
 		onPlayStateChanged(isPlaying)
 	}
-	LaunchedEffect(currentIndex, isPlaying) {
+	val fadeAuto = SettingsManager.getFadeOnAuto(context).toLong()
+	LaunchedEffect(currentIndex, isPlaying, fadeAuto) {
+		var isFadingOut = false
 		while (isPlaying) {
 			val pos = exoPlayer.currentPosition
 			val dur = exoPlayer.duration
 			currentTime = pos
 			totalTime = if (dur > 0) dur else 0L
 			progress = if (dur > 0) pos.toFloat() / dur.toFloat() else 0f
+			
+			if (fadeAuto > 0 && dur > 0 && (dur - pos) <= fadeAuto && !isFadingOut) {
+				isFadingOut = true
+				startVolumeAnimation(exoPlayer, 1f, 0f, fadeAuto)
+			}
 			kotlinx.coroutines.delay(500)
 		}
 	}
@@ -1049,6 +1137,14 @@ fun AudioPlayerView(
 				val newIndex = exoPlayer.currentMediaItemIndex
 				if (currentIndex != newIndex) {
 					currentIndex = newIndex
+				}
+				if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
+					val fadeAutoDuration = SettingsManager.getFadeOnAuto(context).toLong()
+					if (fadeAutoDuration > 0) {
+						startVolumeAnimation(exoPlayer, 0f, 1f, fadeAutoDuration)
+					} else {
+						exoPlayer.volume = 1f
+					}
 				}
 			}
 
@@ -1132,26 +1228,28 @@ fun AudioPlayerView(
 		}
 		Surface(shadowElevation = 8.dp) {
 			Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-				Text(
-					text = "Now Playing: ${playlist.name} - Track ${currentIndex + 1} of ${playlist.uris.size}",
-					style = MaterialTheme.typography.labelMedium,
-					modifier = Modifier.padding(bottom = 8.dp)
-				)
-				Slider(
-					value = progress,
-					onValueChange = { 
-						progress = it
-						val newPos = (it * exoPlayer.duration).toLong()
-						if (newPos >= 0) exoPlayer.seekTo(newPos)
-					},
-					modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Seek" }
-				)
-				Row(
-					modifier = Modifier.fillMaxWidth().clearAndSetSemantics { }, 
-					horizontalArrangement = Arrangement.SpaceBetween
-				) {
-					Text(formatTime(currentTime))
-					Text(formatTime(totalTime))
+				Column(modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) {}) {
+					Text(
+						text = "Now Playing: ${playlist.name} - Track ${currentIndex + 1} of ${playlist.uris.size}",
+						style = MaterialTheme.typography.labelMedium,
+						modifier = Modifier.padding(bottom = 8.dp)
+					)
+					Slider(
+						value = progress,
+						onValueChange = { 
+							progress = it
+							val newPos = (it * exoPlayer.duration).toLong()
+							if (newPos >= 0) seekToTime(newPos)
+						},
+						modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Seek" }
+					)
+					Row(
+						modifier = Modifier.fillMaxWidth(), 
+						horizontalArrangement = Arrangement.SpaceBetween
+					) {
+						Text(formatTime(currentTime))
+						Text(formatTime(totalTime))
+					}
 				}
 				Row(
 					modifier = Modifier.fillMaxWidth(),
@@ -1164,7 +1262,7 @@ fun AudioPlayerView(
 					) {
 						Icon(Icons.Default.SkipPrevious, contentDescription = "Previous")
 					}
-					IconButton(onClick = { if (isPlaying) exoPlayer.pause() else exoPlayer.play() }) {
+					IconButton(onClick = { if (isPlaying) pausePlayback() else startPlayback() }) {
 						Icon(
 							if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, 
 							contentDescription = if (isPlaying) "Pause" else "Play"

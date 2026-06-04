@@ -17,6 +17,10 @@ object SettingsManager {
     private const val KEY_AMPLIFIER_LEVEL = "amplifier_level"
     private const val KEY_AMPLIFIER_ENABLED = "amplifier_enabled"
     private const val KEY_EXIT_PROMPT = "exit_prompt"
+    private const val KEY_FADE_SEEK = "fade_seek"
+    private const val KEY_FADE_PAUSE = "fade_pause"
+    private const val KEY_FADE_MANUAL = "fade_manual"
+    private const val KEY_FADE_AUTO = "fade_auto"
 
     fun getPrefs(context: Context): SharedPreferences {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -78,4 +82,16 @@ object SettingsManager {
     fun setLockTimeout(context: Context, timeout: LockTimeout) {
         getPrefs(context).edit().putString(KEY_LOCK_TIMEOUT, timeout.name).apply()
     }
+
+    fun getFadeOnSeek(context: Context): Int = getPrefs(context).getInt(KEY_FADE_SEEK, 0)
+    fun setFadeOnSeek(context: Context, ms: Int) = getPrefs(context).edit().putInt(KEY_FADE_SEEK, ms).apply()
+
+    fun getFadeOnPause(context: Context): Int = getPrefs(context).getInt(KEY_FADE_PAUSE, 0)
+    fun setFadeOnPause(context: Context, ms: Int) = getPrefs(context).edit().putInt(KEY_FADE_PAUSE, ms).apply()
+
+    fun getFadeOnManual(context: Context): Int = getPrefs(context).getInt(KEY_FADE_MANUAL, 0)
+    fun setFadeOnManual(context: Context, ms: Int) = getPrefs(context).edit().putInt(KEY_FADE_MANUAL, ms).apply()
+
+    fun getFadeOnAuto(context: Context): Int = getPrefs(context).getInt(KEY_FADE_AUTO, 0)
+    fun setFadeOnAuto(context: Context, ms: Int) = getPrefs(context).edit().putInt(KEY_FADE_AUTO, ms).apply()
 }
