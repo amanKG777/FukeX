@@ -17,10 +17,16 @@ object SettingsManager {
     private const val KEY_AMPLIFIER_LEVEL = "amplifier_level"
     private const val KEY_AMPLIFIER_ENABLED = "amplifier_enabled"
     private const val KEY_EXIT_PROMPT = "exit_prompt"
-    private const val KEY_FADE_SEEK = "fade_seek"
-    private const val KEY_FADE_PAUSE = "fade_pause"
-    private const val KEY_FADE_MANUAL = "fade_manual"
-    private const val KEY_FADE_AUTO = "fade_auto"
+    private const val KEY_FADE_IN_SEEK = "fade_in_seek"
+    private const val KEY_FADE_OUT_SEEK = "fade_out_seek"
+    private const val KEY_FADE_IN_PAUSE = "fade_in_pause"
+    private const val KEY_FADE_OUT_PAUSE = "fade_out_pause"
+    private const val KEY_FADE_IN_MANUAL = "fade_in_manual"
+    private const val KEY_FADE_OUT_MANUAL = "fade_out_manual"
+    private const val KEY_FADE_IN_AUTO = "fade_in_auto"
+    private const val KEY_FADE_OUT_AUTO = "fade_out_auto"
+    private const val KEY_SKIP_SILENCE = "skip_silence"
+    private const val KEY_SKIP_UNAVAILABLE = "skip_unavailable"
 
     fun getPrefs(context: Context): SharedPreferences {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -40,6 +46,22 @@ object SettingsManager {
 
     fun setExitPromptEnabled(context: Context, enabled: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_EXIT_PROMPT, enabled).apply()
+    }
+
+    fun isSkipSilenceEnabled(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_SKIP_SILENCE, false)
+    }
+
+    fun setSkipSilenceEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_SKIP_SILENCE, enabled).apply()
+    }
+
+    fun isSkipUnavailableTracksEnabled(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_SKIP_UNAVAILABLE, false)
+    }
+
+    fun setSkipUnavailableTracksEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_SKIP_UNAVAILABLE, enabled).apply()
     }
 
     fun getAmplifierLevel(context: Context): Int {
@@ -83,15 +105,35 @@ object SettingsManager {
         getPrefs(context).edit().putString(KEY_LOCK_TIMEOUT, timeout.name).apply()
     }
 
-    fun getFadeOnSeek(context: Context): Int = getPrefs(context).getInt(KEY_FADE_SEEK, 0)
-    fun setFadeOnSeek(context: Context, ms: Int) = getPrefs(context).edit().putInt(KEY_FADE_SEEK, ms).apply()
+    fun getFadeInSeek(context: Context): Int = getPrefs(context).getInt(KEY_FADE_IN_SEEK, 0)
 
-    fun getFadeOnPause(context: Context): Int = getPrefs(context).getInt(KEY_FADE_PAUSE, 0)
-    fun setFadeOnPause(context: Context, ms: Int) = getPrefs(context).edit().putInt(KEY_FADE_PAUSE, ms).apply()
+    fun setFadeInSeek(context: Context, ms: Int) = getPrefs(context).edit().putInt(KEY_FADE_IN_SEEK, ms).apply()
 
-    fun getFadeOnManual(context: Context): Int = getPrefs(context).getInt(KEY_FADE_MANUAL, 0)
-    fun setFadeOnManual(context: Context, ms: Int) = getPrefs(context).edit().putInt(KEY_FADE_MANUAL, ms).apply()
+    fun getFadeOutSeek(context: Context): Int = getPrefs(context).getInt(KEY_FADE_OUT_SEEK, 0)
 
-    fun getFadeOnAuto(context: Context): Int = getPrefs(context).getInt(KEY_FADE_AUTO, 0)
-    fun setFadeOnAuto(context: Context, ms: Int) = getPrefs(context).edit().putInt(KEY_FADE_AUTO, ms).apply()
+    fun setFadeOutSeek(context: Context, ms: Int) = getPrefs(context).edit().putInt(KEY_FADE_OUT_SEEK, ms).apply()
+
+    fun getFadeInPause(context: Context): Int = getPrefs(context).getInt(KEY_FADE_IN_PAUSE, 0)
+
+    fun setFadeInPause(context: Context, ms: Int) = getPrefs(context).edit().putInt(KEY_FADE_IN_PAUSE, ms).apply()
+
+    fun getFadeOutPause(context: Context): Int = getPrefs(context).getInt(KEY_FADE_OUT_PAUSE, 0)
+
+    fun setFadeOutPause(context: Context, ms: Int) = getPrefs(context).edit().putInt(KEY_FADE_OUT_PAUSE, ms).apply()
+
+    fun getFadeInManual(context: Context): Int = getPrefs(context).getInt(KEY_FADE_IN_MANUAL, 0)
+
+    fun setFadeInManual(context: Context, ms: Int) = getPrefs(context).edit().putInt(KEY_FADE_IN_MANUAL, ms).apply()
+
+    fun getFadeOutManual(context: Context): Int = getPrefs(context).getInt(KEY_FADE_OUT_MANUAL, 0)
+
+    fun setFadeOutManual(context: Context, ms: Int) = getPrefs(context).edit().putInt(KEY_FADE_OUT_MANUAL, ms).apply()
+
+    fun getFadeInAuto(context: Context): Int = getPrefs(context).getInt(KEY_FADE_IN_AUTO, 0)
+
+    fun setFadeInAuto(context: Context, ms: Int) = getPrefs(context).edit().putInt(KEY_FADE_IN_AUTO, ms).apply()
+
+    fun getFadeOutAuto(context: Context): Int = getPrefs(context).getInt(KEY_FADE_OUT_AUTO, 0)
+
+    fun setFadeOutAuto(context: Context, ms: Int) = getPrefs(context).edit().putInt(KEY_FADE_OUT_AUTO, ms).apply()
 }

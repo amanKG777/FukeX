@@ -44,7 +44,6 @@ class PlaybackService : Service() {
             ACTION_PREV -> activeMediaSession?.takeIf { it.isActive }?.controller?.transportControls?.skipToPrevious()
             ACTION_STOP -> {
                 activeMediaSession?.takeIf { it.isActive }?.controller?.transportControls?.stop()
-                
                 // Call startForeground with a dummy/empty notification to satisfy the foreground contract
                 // before stopping, just in case this intent was delivered after a startForegroundService call
                 // but before startForeground was called, or if the system gets confused.
@@ -56,7 +55,6 @@ class PlaybackService : Service() {
                 } else {
                     startForeground(NOTIFICATION_ID, notification)
                 }
-                
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
                 return START_NOT_STICKY

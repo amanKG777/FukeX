@@ -11,10 +11,14 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LockClock
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
@@ -44,6 +48,8 @@ fun SettingsScreen(
 	val activity = remember(context) { context.findActivity() }
 	var isBiometricEnabled by remember { mutableStateOf(SettingsManager.isBiometricEnabled(context)) }
 	var isBackgroundPlaybackEnabled by remember { mutableStateOf(SettingsManager.isBackgroundPlaybackEnabled(context)) }
+	var isSkipSilenceEnabled by remember { mutableStateOf(SettingsManager.isSkipSilenceEnabled(context)) }
+	var isSkipUnavailableEnabled by remember { mutableStateOf(SettingsManager.isSkipUnavailableTracksEnabled(context)) }
 	var isExitPromptEnabled by remember { mutableStateOf(SettingsManager.isExitPromptEnabled(context)) }
 	var lockTimeout by remember { mutableStateOf(SettingsManager.getLockTimeout(context)) }
 	var showTimeoutDialog by remember { mutableStateOf(false) }
@@ -51,11 +57,9 @@ fun SettingsScreen(
 	var amplifierLevel by remember { mutableIntStateOf(SettingsManager.getAmplifierLevel(context)) }
 	var showAmplifierWarning by remember { mutableStateOf(false) }
 	var pendingAmplifierLevel by remember { mutableIntStateOf(0) }
-	var fadeOnSeek by remember { mutableIntStateOf(SettingsManager.getFadeOnSeek(context)) }
-	var fadeOnPause by remember { mutableIntStateOf(SettingsManager.getFadeOnPause(context)) }
-	var fadeOnManual by remember { mutableIntStateOf(SettingsManager.getFadeOnManual(context)) }
-	var fadeOnAuto by remember { mutableIntStateOf(SettingsManager.getFadeOnAuto(context)) }
-
+	var selectedFadeEvent by remember { mutableStateOf("Manual Track Change") }
+	val fadeEvents = listOf("Seek", "Pause/Play", "Manual Track Change", "Automatic Track Change")
+	var fadeMenuExpanded by remember { mutableStateOf(false) }
 	if (showAboutScreen) {
 		AboutScreen(onBack = { showAboutScreen = false })
 		return
@@ -146,68 +150,142 @@ fun SettingsScreen(
 						isBackgroundPlaybackEnabled = it 
 					}
 				)
-				ListItem(
-					modifier = Modifier.semantics(mergeDescendants = true) {},
-					headlineContent = { Text("Amplifier Boost: ${amplifierLevel / 100} dB") },
-					supportingContent = {
-						Column {
-							Text("Increase volume beyond standard limits.")
-							Slider(
-								value = (amplifierLevel / 500).toFloat(),
-								onValueChange = { 
-									val newLevel = (it.toInt() * 500)
-									if (newLevel > 1500 && newLevel > amplifierLevel) {
-										pendingAmplifierLevel = newLevel
-										showAmplifierWarning = true
-									} else {
-										amplifierLevel = newLevel
-										SettingsManager.setAmplifierLevel(context, newLevel)
-									}
-								},
-								valueRange = 0f..5f,
-								steps = 4,
-								modifier = Modifier.fillMaxWidth().semantics { 
-									contentDescription = "Amplifier slider"
-									stateDescription = "${amplifierLevel / 100} decibels"
-								}
-							)
-						}
-					},
-					leadingContent = { Icon(Icons.AutoMirrored.Filled.VolumeUp, null) }
+				SettingsToggleItem(
+					title = "Skip Silence",
+					subtitle = "Speed through quiet or silent parts (not recommended for music)",
+					icon = Icons.Default.FastForward,
+					checked = isSkipSilenceEnabled,
+					onCheckedChange = { 
+						SettingsManager.setSkipSilenceEnabled(context, it)
+						isSkipSilenceEnabled = it 
+					}
 				)
+				SettingsToggleItem(
+					title = "Skip Unavailable Tracks",
+					subtitle = "Automatically skip to the next track if a file cannot be played",
+					icon = Icons.Default.SkipNext,
+					checked = isSkipUnavailableEnabled,
+					onCheckedChange = { 
+						SettingsManager.setSkipUnavailableTracksEnabled(context, it)
+						isSkipUnavailableEnabled = it 
+					}
+				)
+				Column(
+					modifier = Modifier
+						.fillMaxWidth()
+						.padding(horizontal = 16.dp, vertical = 8.dp)
+						.clearAndSetSemantics {
+							contentDescription = "Amplifier Boost"
+							setProgress { targetValue ->
+								val newLevel = (targetValue.toInt() * 500)
+								if (newLevel > 1500 && newLevel > amplifierLevel) {
+									pendingAmplifierLevel = newLevel
+									showAmplifierWarning = true
+								} else {
+									amplifierLevel = newLevel
+									SettingsManager.setAmplifierLevel(context, newLevel)
+								}
+								true
+							}
+							progressBarRangeInfo = ProgressBarRangeInfo(
+								current = (amplifierLevel / 500).toFloat(),
+								range = 0f..5f,
+								steps = 4
+							)
+							stateDescription = "${amplifierLevel / 100} decibels"
+						}
+				) {
+					Row(verticalAlignment = Alignment.CenterVertically) {
+						Icon(Icons.AutoMirrored.Filled.VolumeUp, null, modifier = Modifier.padding(end = 16.dp))
+						Column {
+							Text("Amplifier Boost: ${amplifierLevel / 100} dB", style = MaterialTheme.typography.bodyLarge)
+							Text("Increase volume beyond standard limits.", style = MaterialTheme.typography.bodyMedium)
+						}
+					}
+					Slider(
+						value = (amplifierLevel / 500).toFloat(),
+						onValueChange = { 
+							val newLevel = (it.toInt() * 500)
+							if (newLevel > 1500 && newLevel > amplifierLevel) {
+								pendingAmplifierLevel = newLevel
+								showAmplifierWarning = true
+							} else {
+								amplifierLevel = newLevel
+								SettingsManager.setAmplifierLevel(context, newLevel)
+							}
+						},
+						valueRange = 0f..5f,
+						steps = 4,
+						modifier = Modifier.fillMaxWidth().clearAndSetSemantics {}
+					)
+				}
 			}
 			item {
 				SettingsHeader("Fading (Gapless Playback)")
+				Box(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+					OutlinedButton(onClick = { fadeMenuExpanded = true }, modifier = Modifier.fillMaxWidth()) {
+						Text("Event: $selectedFadeEvent")
+						Icon(Icons.Default.ArrowDropDown, null)
+					}
+					DropdownMenu(
+						expanded = fadeMenuExpanded,
+						onDismissRequest = { fadeMenuExpanded = false }
+					) {
+						fadeEvents.forEach { event ->
+							DropdownMenuItem(
+								text = { Text(event) },
+								onClick = {
+									selectedFadeEvent = event
+									fadeMenuExpanded = false
+								}
+							)
+						}
+					}
+				}
+				var fadeInValue by remember(selectedFadeEvent) { 
+					mutableIntStateOf(
+						when (selectedFadeEvent) {
+							"Seek" -> SettingsManager.getFadeInSeek(context)
+							"Pause/Play" -> SettingsManager.getFadeInPause(context)
+							"Manual Track Change" -> SettingsManager.getFadeInManual(context)
+							else -> SettingsManager.getFadeInAuto(context)
+						}
+					)
+				}
+				var fadeOutValue by remember(selectedFadeEvent) { 
+					mutableIntStateOf(
+						when (selectedFadeEvent) {
+							"Seek" -> SettingsManager.getFadeOutSeek(context)
+							"Pause/Play" -> SettingsManager.getFadeOutPause(context)
+							"Manual Track Change" -> SettingsManager.getFadeOutManual(context)
+							else -> SettingsManager.getFadeOutAuto(context)
+						}
+					)
+				}
 				FadeSliderItem(
-					title = "Fade on Seek",
-					msValue = fadeOnSeek,
+					title = "Fade In",
+					msValue = fadeInValue,
 					onValueChange = {
-						fadeOnSeek = it
-						SettingsManager.setFadeOnSeek(context, it)
+						fadeInValue = it
+						when (selectedFadeEvent) {
+							"Seek" -> SettingsManager.setFadeInSeek(context, it)
+							"Pause/Play" -> SettingsManager.setFadeInPause(context, it)
+							"Manual Track Change" -> SettingsManager.setFadeInManual(context, it)
+							"Automatic Track Change" -> SettingsManager.setFadeInAuto(context, it)
+						}
 					}
 				)
 				FadeSliderItem(
-					title = "Fade on Pause/Play",
-					msValue = fadeOnPause,
+					title = "Fade Out",
+					msValue = fadeOutValue,
 					onValueChange = {
-						fadeOnPause = it
-						SettingsManager.setFadeOnPause(context, it)
-					}
-				)
-				FadeSliderItem(
-					title = "Fade on Manual Track Change",
-					msValue = fadeOnManual,
-					onValueChange = {
-						fadeOnManual = it
-						SettingsManager.setFadeOnManual(context, it)
-					}
-				)
-				FadeSliderItem(
-					title = "Fade on Automatic Track Change",
-					msValue = fadeOnAuto,
-					onValueChange = {
-						fadeOnAuto = it
-						SettingsManager.setFadeOnAuto(context, it)
+						fadeOutValue = it
+						when (selectedFadeEvent) {
+							"Seek" -> SettingsManager.setFadeOutSeek(context, it)
+							"Pause/Play" -> SettingsManager.setFadeOutPause(context, it)
+							"Manual Track Change" -> SettingsManager.setFadeOutManual(context, it)
+							"Automatic Track Change" -> SettingsManager.setFadeOutAuto(context, it)
+						}
 					}
 				)
 			}
@@ -350,22 +428,36 @@ fun SettingsToggleItem(
 
 @Composable
 fun FadeSliderItem(title: String, msValue: Int, onValueChange: (Int) -> Unit) {
-	ListItem(modifier = Modifier.semantics(mergeDescendants = true) {},
-		headlineContent = { Text(title) },
-		supportingContent = {
-			Column {
-				Text(if (msValue == 0) "Disabled" else "$msValue ms")
-				Slider(
-					value = msValue.toFloat(),
-					onValueChange = { onValueChange((Math.round(it / 500f) * 500)) },
-					valueRange = 0f..10000f,
-					modifier = Modifier.fillMaxWidth().semantics {
-						contentDescription = "$title slider"
-						stateDescription = "$msValue milliseconds"
-					}
+	Column(
+		modifier = Modifier
+			.fillMaxWidth()
+			.padding(horizontal = 16.dp, vertical = 8.dp)
+			.clearAndSetSemantics {
+				contentDescription = title
+				setProgress { targetValue ->
+					onValueChange((Math.round(targetValue / 10f) * 10))
+					true
+				}
+				progressBarRangeInfo = ProgressBarRangeInfo(
+					current = msValue.toFloat(),
+					range = 0f..10000f,
+					steps = 1000
 				)
+				stateDescription = if (msValue == 0) "Disabled" else "$msValue milliseconds"
 			}
-		},
-		leadingContent = { Icon(Icons.Default.GraphicEq, null) }
-	)
+	) {
+		Row(verticalAlignment = Alignment.CenterVertically) {
+			Icon(Icons.Default.GraphicEq, null, modifier = Modifier.padding(end = 16.dp))
+			Column {
+				Text(title, style = MaterialTheme.typography.bodyLarge)
+				Text(if (msValue == 0) "Disabled" else "$msValue ms", style = MaterialTheme.typography.bodyMedium)
+			}
+		}
+		Slider(
+			value = msValue.toFloat(),
+			onValueChange = { onValueChange((Math.round(it / 10f) * 10)) },
+			valueRange = 0f..10000f,
+			modifier = Modifier.fillMaxWidth().clearAndSetSemantics {}
+		)
+	}
 }

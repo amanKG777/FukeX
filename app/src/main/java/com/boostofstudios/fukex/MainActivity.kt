@@ -49,6 +49,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import com.boostofstudios.fukex.data.AuthType
 import com.boostofstudios.fukex.data.Playlist
 import com.boostofstudios.fukex.data.PlaylistManager
+import com.boostofstudios.fukex.data.PlayerCacheManager
 import com.boostofstudios.fukex.ui.theme.FukeXTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -112,20 +113,20 @@ fun MainScreen(modifier: Modifier = Modifier) {
 	var showPlaylistSelectionDialog by remember { mutableStateOf(false) }
 	var authError by remember { mutableStateOf("") }
 	var showFilePicker by remember { mutableStateOf(false) }
+	var showSmbPicker by remember { mutableStateOf(false) }
+	var showAddMediaDialog by remember { mutableStateOf(false) }
 	var showSettings by remember { mutableStateOf(false) }
 	var showExitDialog by remember { mutableStateOf(false) }
 	var lastActiveTimes by remember { mutableStateOf(mapOf<String, Long>()) }
 	var currentlyPlayingPlaylistId by remember { mutableStateOf<String?>(null) }
 	val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-
-	androidx.activity.compose.BackHandler(enabled = !showSettings && !showFilePicker && !showNameDialog) {
+	androidx.activity.compose.BackHandler(enabled = !showSettings && !showFilePicker && !showSmbPicker && !showNameDialog) {
 		if (SettingsManager.isExitPromptEnabled(context)) {
 			showExitDialog = true
 		} else {
 			(context as? MainActivity)?.finish()
 		}
 	}
-
 	if (showExitDialog) {
 		AlertDialog(
 			onDismissRequest = { showExitDialog = false },
@@ -143,7 +144,6 @@ fun MainScreen(modifier: Modifier = Modifier) {
 			}
 		)
 	}
-
 	LaunchedEffect(unlockedPlaylistIds, currentlyPlayingPlaylistId, lastActiveTimes) {
 		while (true) {
 			kotlinx.coroutines.delay(10000) // Check every 10 seconds
@@ -305,7 +305,7 @@ fun MainScreen(modifier: Modifier = Modifier) {
 			)
 		},
 		floatingActionButton = {
-			FloatingActionButton(onClick = { showFilePicker = true }) {
+			FloatingActionButton(onClick = { showAddMediaDialog = true }) {
 				Icon(Icons.Default.Add, contentDescription = "Add Media to Playlist")
 			}
 		}
@@ -790,6 +790,50 @@ Box(modifier = Modifier.weight(1f)) {
 			}
 		)
 	}
+		if (showAddMediaDialog) {
+			AlertDialog(
+				onDismissRequest = { showAddMediaDialog = false },
+				title = { Text("Add Media") },
+				text = {
+					Column {
+						Text("Where would you like to add media from?")
+					}
+				},
+				confirmButton = {
+					TextButton(onClick = {
+						showAddMediaDialog = false
+						showFilePicker = true
+					}) { Text("Local Device") }
+				},
+				dismissButton = {
+					TextButton(onClick = {
+						showAddMediaDialog = false
+						showSmbPicker = true
+					}) { Text("SMB Share") }
+				}
+			)
+		}
+		if (showSmbPicker) {
+			SmbPickerScreen(
+				onFilesSelected = { uris ->
+					showSmbPicker = false
+					if (uris.isNotEmpty() && visiblePlaylists.isNotEmpty()) {
+						val safeIndex = kotlin.math.min(selectedTabIndex, visiblePlaylists.lastIndex)
+						if (safeIndex >= 0) {
+							val currentPlaylist = visiblePlaylists[safeIndex]
+							val updatedPlaylist = currentPlaylist.copy(uris = currentPlaylist.uris + uris)
+							val newList = playlists.map { if (it.id == currentPlaylist.id) updatedPlaylist else it }
+							playlists = newList
+							scope.launch(Dispatchers.IO) {
+								PlaylistManager.savePlaylists(context, newList)
+							}
+							lastActiveTimes = lastActiveTimes + (currentPlaylist.id to System.currentTimeMillis())
+						}
+					}
+				},
+				onCancel = { showSmbPicker = false }
+			)
+		}
 		if (showFilePicker) {
 			FilePickerScreen(
 				onFilesSelected = { uris ->
@@ -817,6 +861,61 @@ Box(modifier = Modifier.weight(1f)) {
 	}
 }
 
+fun createFukexPlayer(context: android.content.Context): androidx.media3.exoplayer.ExoPlayer {
+	val audioAttributes = androidx.media3.common.AudioAttributes.Builder()
+		.setUsage(androidx.media3.common.C.USAGE_MEDIA)
+		.setContentType(androidx.media3.common.C.AUDIO_CONTENT_TYPE_MUSIC)
+		.build()
+	val defaultDataSourceFactory = androidx.media3.datasource.DefaultDataSource.Factory(context)
+	val customDataSourceFactory = androidx.media3.datasource.DataSource.Factory {
+		val defaultDataSource = defaultDataSourceFactory.createDataSource()
+
+		object : androidx.media3.datasource.DataSource {
+			val smbDataSource = com.boostofstudios.fukex.data.SmbDataSource()
+			var activeDataSource: androidx.media3.datasource.DataSource? = null
+
+			override fun addTransferListener(transferListener: androidx.media3.datasource.TransferListener) {
+				defaultDataSource.addTransferListener(transferListener)
+				smbDataSource.addTransferListener(transferListener)
+			}
+
+			override fun open(dataSpec: androidx.media3.datasource.DataSpec): Long {
+				activeDataSource = if (dataSpec.uri.scheme?.startsWith("smb") == true) smbDataSource else defaultDataSource
+				return activeDataSource!!.open(dataSpec)
+			}
+
+			override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+				return activeDataSource!!.read(buffer, offset, length)
+			}
+
+			override fun getUri(): android.net.Uri? {
+				return activeDataSource?.uri
+			}
+
+			override fun close() {
+				activeDataSource?.close()
+				activeDataSource = null
+			}
+		}
+	}
+	val cacheDataSourceFactory = androidx.media3.datasource.cache.CacheDataSource.Factory()
+		.setCache(PlayerCacheManager.getCache(context))
+		.setUpstreamDataSourceFactory(customDataSourceFactory)
+		.setFlags(androidx.media3.datasource.cache.CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+	val mediaSourceFactory = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(context)
+		.setDataSourceFactory(cacheDataSourceFactory)
+	return androidx.media3.exoplayer.ExoPlayer.Builder(context)
+		.setMediaSourceFactory(mediaSourceFactory)
+		.setAudioAttributes(audioAttributes, false)
+		.setHandleAudioBecomingNoisy(true)
+		.setSkipSilenceEnabled(SettingsManager.isSkipSilenceEnabled(context))
+		.build().apply {
+			trackSelectionParameters = trackSelectionParameters.buildUpon()
+				.setTrackTypeDisabled(androidx.media3.common.C.TRACK_TYPE_VIDEO, true)
+				.build()
+		}
+}
+
 @Composable
 fun AudioPlayerView(
 	playlist: Playlist,
@@ -829,17 +928,12 @@ fun AudioPlayerView(
 	onUpdatePlaylist: (Playlist) -> Unit
 ) {
 	val context = LocalContext.current
-	val exoPlayer = remember { 
-		val audioAttributes = androidx.media3.common.AudioAttributes.Builder()
-			.setUsage(androidx.media3.common.C.USAGE_MEDIA)
-			.setContentType(androidx.media3.common.C.AUDIO_CONTENT_TYPE_MUSIC)
-			.build()
-		androidx.media3.exoplayer.ExoPlayer.Builder(context)
-			.setAudioAttributes(audioAttributes, true)
-			.setHandleAudioBecomingNoisy(true)
-			.setSkipSilenceEnabled(true)
-			.build()
-	}
+	val scope = rememberCoroutineScope()
+	val player1 = remember { createFukexPlayer(context) }
+	val player2 = remember { createFukexPlayer(context) }
+	val players = remember { listOf(player1, player2) }
+	var activePlayerIndex by remember { mutableIntStateOf(0) }
+	val exoPlayer = players[activePlayerIndex]
 	var currentIndex by remember { mutableIntStateOf(playlist.lastIndex) }
 	var isPlaying by remember { mutableStateOf(false) }
 	var progress by remember { mutableFloatStateOf(0f) }
@@ -854,7 +948,6 @@ fun AudioPlayerView(
 	var amplifierEnabled by remember { mutableStateOf(SettingsManager.isAmplifierEnabled(context)) }
 	var amplifierLevel by remember { mutableIntStateOf(SettingsManager.getAmplifierLevel(context)) }
 	var loudnessEnhancer by remember { mutableStateOf<LoudnessEnhancer?>(null) }
-
 	val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
 	DisposableEffect(lifecycleOwner) {
 		val observer = LifecycleEventObserver { _, event ->
@@ -869,13 +962,15 @@ fun AudioPlayerView(
 			lifecycleOwner.lifecycle.removeObserver(observer)
 		}
 	}
-
 	DisposableEffect(context) {
 		val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
 			if (key == "amplifier_enabled") {
 				amplifierEnabled = SettingsManager.isAmplifierEnabled(context)
 			} else if (key == "amplifier_level") {
 				amplifierLevel = SettingsManager.getAmplifierLevel(context)
+			} else if (key == "skip_silence") {
+				val skip = SettingsManager.isSkipSilenceEnabled(context)
+				players.forEach { it.skipSilenceEnabled = skip }
 			}
 		}
 		SettingsManager.registerChangeListener(context, listener)
@@ -920,73 +1015,90 @@ fun AudioPlayerView(
 			}
 		}
 	}
+	val volumeAnimators = remember { mutableMapOf<androidx.media3.exoplayer.ExoPlayer, kotlinx.coroutines.Job>() }
 
-	var fadeOutAnimator by remember { mutableStateOf<android.animation.ValueAnimator?>(null) }
-
-	fun startVolumeAnimation(player: ExoPlayer, from: Float, to: Float, durationMs: Long, onEnd: () -> Unit = {}) {
-		fadeOutAnimator?.cancel()
+	fun startVolumeAnimation(player: androidx.media3.exoplayer.ExoPlayer, from: Float, to: Float, durationMs: Long, onEnd: () -> Unit = {}) {
+		volumeAnimators[player]?.cancel()
 		if (durationMs <= 0) {
 			player.volume = to
 			onEnd()
 			return
 		}
-		val animator = android.animation.ValueAnimator.ofFloat(from, to).apply {
-			duration = durationMs
-			addUpdateListener { player.volume = it.animatedValue as Float }
-			addListener(object : android.animation.AnimatorListenerAdapter() {
-				override fun onAnimationEnd(animation: android.animation.Animator) {
+		val job = scope.launch(Dispatchers.Main) {
+			val startTime = System.currentTimeMillis()
+			while (true) {
+				val elapsed = System.currentTimeMillis() - startTime
+				if (elapsed >= durationMs) {
+					player.volume = to
 					onEnd()
+					break
 				}
-			})
-			start()
+				val fraction = elapsed.toFloat() / durationMs.toFloat()
+				player.volume = from + (to - from) * fraction
+				kotlinx.coroutines.delay(16) // ~60fps
+			}
 		}
-		fadeOutAnimator = animator
+		volumeAnimators[player] = job
 	}
 
 	fun playIndex(index: Int, play: Boolean = true) {
+		isInitialPlayback = false
 		if (index in playlist.uris.indices) {
-			val fadeManual = SettingsManager.getFadeOnManual(context).toLong()
-			val startPlayback = {
-				exoPlayer.seekTo(index, 0L)
+			val fadeOutManual = SettingsManager.getFadeOutManual(context).toLong()
+			val fadeInManual = SettingsManager.getFadeInManual(context).toLong()
+			val startPlayback = { p: androidx.media3.exoplayer.ExoPlayer ->
+				p.seekTo(index, 0L)
+				if (p.playbackState == androidx.media3.common.Player.STATE_IDLE) {
+					p.prepare()
+				}
 				if (play) {
-					exoPlayer.playWhenReady = true
-					startVolumeAnimation(exoPlayer, 0f, 1f, fadeManual)
+					p.playWhenReady = true
+					startVolumeAnimation(p, 0f, 1f, fadeInManual)
 				} else {
-					exoPlayer.volume = 1f
+					p.volume = 1f
 				}
 			}
-			
-			if (fadeManual > 0 && isPlaying) {
-				startVolumeAnimation(exoPlayer, exoPlayer.volume, 0f, fadeManual, startPlayback)
+			if (fadeOutManual > 0 && isPlaying) {
+				val previousPlayer = exoPlayer
+				activePlayerIndex = (activePlayerIndex + 1) % 2
+				val newPlayer = players[activePlayerIndex]
+				startVolumeAnimation(previousPlayer, previousPlayer.volume, 0f, fadeOutManual) {
+					previousPlayer.pause()
+				}
+				startPlayback(newPlayer)
 			} else {
-				startPlayback()
+				startPlayback(exoPlayer)
+			}
+		}
+	}
+	LaunchedEffect(playlist.uris) {
+		val items = playlist.uris.map { androidx.media3.common.MediaItem.fromUri(it) }
+		players.forEach { player ->
+			if (items.isNotEmpty()) {
+				if (player.mediaItemCount == 0) {
+					player.setMediaItems(items)
+					player.prepare()
+					if (currentIndex in items.indices) {
+						player.seekTo(currentIndex, 0L)
+					}
+				} else {
+					val currentIdx = player.currentMediaItemIndex
+					val currentPos = player.currentPosition
+					player.setMediaItems(items, currentIdx, currentPos)
+					if (player.playbackState == androidx.media3.common.Player.STATE_IDLE) {
+						player.prepare()
+					}
+				}
+			} else {
+				player.clearMediaItems()
 			}
 		}
 	}
 
-	LaunchedEffect(playlist.uris) {
-		val items = playlist.uris.map { MediaItem.fromUri(it) }
-		if (items.isNotEmpty()) {
-			if (exoPlayer.mediaItemCount == 0) {
-				exoPlayer.setMediaItems(items)
-				exoPlayer.prepare()
-				if (currentIndex in items.indices) {
-					exoPlayer.seekTo(currentIndex, 0L)
-				}
-			} else {
-				val currentIdx = exoPlayer.currentMediaItemIndex
-				val currentPos = exoPlayer.currentPosition
-				exoPlayer.setMediaItems(items, currentIdx, currentPos)
-			}
-		} else {
-			exoPlayer.clearMediaItems()
-		}
-	}
-	
 	fun pausePlayback() {
-		val fadePause = SettingsManager.getFadeOnPause(context).toLong()
-		if (fadePause > 0 && isPlaying) {
-			startVolumeAnimation(exoPlayer, exoPlayer.volume, 0f, fadePause) {
+		val fadeOutPause = SettingsManager.getFadeOutPause(context).toLong()
+		if (fadeOutPause > 0 && isPlaying) {
+			startVolumeAnimation(exoPlayer, exoPlayer.volume, 0f, fadeOutPause) {
 				exoPlayer.pause()
 			}
 		} else {
@@ -995,10 +1107,13 @@ fun AudioPlayerView(
 	}
 
 	fun startPlayback() {
-		val fadePause = SettingsManager.getFadeOnPause(context).toLong()
-		if (fadePause > 0) {
+		if (exoPlayer.playbackState == androidx.media3.common.Player.STATE_IDLE) {
+			exoPlayer.prepare()
+		}
+		val fadeInPause = SettingsManager.getFadeInPause(context).toLong()
+		if (fadeInPause > 0) {
 			exoPlayer.play()
-			startVolumeAnimation(exoPlayer, 0f, 1f, fadePause)
+			startVolumeAnimation(exoPlayer, 0f, 1f, fadeInPause)
 		} else {
 			exoPlayer.volume = 1f
 			exoPlayer.play()
@@ -1006,14 +1121,23 @@ fun AudioPlayerView(
 	}
 
 	fun seekToTime(pos: Long) {
-		val fadeSeek = SettingsManager.getFadeOnSeek(context).toLong()
-		if (fadeSeek > 0 && isPlaying) {
-			startVolumeAnimation(exoPlayer, exoPlayer.volume, 0f, fadeSeek) {
-				exoPlayer.seekTo(pos)
-				startVolumeAnimation(exoPlayer, 0f, 1f, fadeSeek)
+		val fadeOutSeek = SettingsManager.getFadeOutSeek(context).toLong()
+		val fadeInSeek = SettingsManager.getFadeInSeek(context).toLong()
+		if (fadeOutSeek > 0 && isPlaying) {
+			val previousPlayer = exoPlayer
+			activePlayerIndex = (activePlayerIndex + 1) % 2
+			val newPlayer = players[activePlayerIndex]
+			startVolumeAnimation(previousPlayer, previousPlayer.volume, 0f, fadeOutSeek) {
+				previousPlayer.pause()
 			}
+			newPlayer.seekTo(currentIndex, pos)
+			newPlayer.playWhenReady = true
+			startVolumeAnimation(newPlayer, 0f, 1f, fadeInSeek)
 		} else {
 			exoPlayer.seekTo(pos)
+			if (isPlaying && fadeInSeek > 0) {
+				startVolumeAnimation(exoPlayer, 0f, 1f, fadeInSeek)
+			}
 		}
 	}
 	val currentPlayIndex = rememberUpdatedState({ index: Int, play: Boolean -> playIndex(index, play) })
@@ -1099,21 +1223,32 @@ fun AudioPlayerView(
 		}
 		onPlayStateChanged(isPlaying)
 	}
-	val fadeAuto = SettingsManager.getFadeOnAuto(context).toLong()
-	LaunchedEffect(currentIndex, isPlaying, fadeAuto) {
+	LaunchedEffect(currentIndex, isPlaying) {
 		var isFadingOut = false
 		while (isPlaying) {
+			val fadeOutAuto = SettingsManager.getFadeOutAuto(context).toLong()
+			val fadeInAuto = SettingsManager.getFadeInAuto(context).toLong()
 			val pos = exoPlayer.currentPosition
 			val dur = exoPlayer.duration
 			currentTime = pos
 			totalTime = if (dur > 0) dur else 0L
 			progress = if (dur > 0) pos.toFloat() / dur.toFloat() else 0f
-			
-			if (fadeAuto > 0 && dur > 0 && (dur - pos) <= fadeAuto && !isFadingOut) {
+			if (fadeOutAuto > 0 && dur > 0 && (dur - pos) <= fadeOutAuto && !isFadingOut) {
 				isFadingOut = true
-				startVolumeAnimation(exoPlayer, 1f, 0f, fadeAuto)
+				val nextIndex = currentIndex + 1
+				if (nextIndex < playlist.uris.size) {
+					val previousPlayer = exoPlayer
+					activePlayerIndex = (activePlayerIndex + 1) % 2
+					val newPlayer = players[activePlayerIndex]
+					newPlayer.seekTo(nextIndex, 0L)
+					newPlayer.playWhenReady = true
+					startVolumeAnimation(newPlayer, 0f, 1f, fadeInAuto)
+					startVolumeAnimation(previousPlayer, previousPlayer.volume, 0f, fadeOutAuto) {
+						previousPlayer.pause()
+					}
+				}
 			}
-			kotlinx.coroutines.delay(500)
+			kotlinx.coroutines.delay(50)
 		}
 	}
 	LaunchedEffect(currentIndex, isPlaying) {
@@ -1128,34 +1263,62 @@ fun AudioPlayerView(
 		}
 	}
 	DisposableEffect(Unit) {
-		val listener = object : Player.Listener {
-			override fun onIsPlayingChanged(isPlayingChanged: Boolean) {
-				isPlaying = isPlayingChanged
-			}
+		val listeners = players.map { player ->
 
-			override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-				val newIndex = exoPlayer.currentMediaItemIndex
-				if (currentIndex != newIndex) {
-					currentIndex = newIndex
+			object : androidx.media3.common.Player.Listener {
+				override fun onIsPlayingChanged(isPlayingChanged: Boolean) {
+					if (player == players[activePlayerIndex]) {
+						isPlaying = isPlayingChanged
+					}
 				}
-				if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
-					val fadeAutoDuration = SettingsManager.getFadeOnAuto(context).toLong()
-					if (fadeAutoDuration > 0) {
-						startVolumeAnimation(exoPlayer, 0f, 1f, fadeAutoDuration)
-					} else {
-						exoPlayer.volume = 1f
+
+				override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
+					if (player == players[activePlayerIndex]) {
+						val newIndex = player.currentMediaItemIndex
+						if (currentIndex != newIndex) {
+							currentIndex = newIndex
+						}
+						if (reason == androidx.media3.common.Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
+							val fadeInAutoDuration = SettingsManager.getFadeInAuto(context).toLong()
+							if (fadeInAutoDuration > 0) {
+								startVolumeAnimation(player, 0f, 1f, fadeInAutoDuration)
+							} else {
+								player.volume = 1f
+							}
+						}
+					}
+				}
+
+				override fun onAudioSessionIdChanged(audioSessionId: Int) {
+					if (player == players[activePlayerIndex]) {
+						updateAmplifier(audioSessionId)
+					}
+				}
+
+				override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+					val cause = error.cause?.message ?: "Unknown cause"
+					error.printStackTrace()
+					if (player == players[activePlayerIndex]) {
+						if (SettingsManager.isSkipUnavailableTracksEnabled(context)) {
+							android.widget.Toast.makeText(context, "Skipping unavailable track...", android.widget.Toast.LENGTH_SHORT).show()
+							val size = playlist.uris.size
+							if (currentIndex < size - 1) {
+								playIndex(currentIndex + 1)
+							} else {
+								isPlaying = false
+							}
+						} else {
+							android.widget.Toast.makeText(context, "Playback error: ${error.errorCodeName} - ${error.message}\nCause: $cause", android.widget.Toast.LENGTH_LONG).show()
+							isPlaying = false
+						}
 					}
 				}
 			}
-
-			override fun onAudioSessionIdChanged(audioSessionId: Int) {
-				updateAmplifier(audioSessionId)
-			}
 		}
-		exoPlayer.addListener(listener)
+		players.forEachIndexed { i, p -> p.addListener(listeners[i]) }
 		onDispose {
 			loudnessEnhancer?.release()
-			exoPlayer.release()
+			players.forEach { it.release() }
 		}
 	}
 	Column(modifier = modifier) {
@@ -1228,12 +1391,28 @@ fun AudioPlayerView(
 		}
 		Surface(shadowElevation = 8.dp) {
 			Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-				Column(modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) {}) {
-					Text(
-						text = "Now Playing: ${playlist.name} - Track ${currentIndex + 1} of ${playlist.uris.size}",
-						style = MaterialTheme.typography.labelMedium,
-						modifier = Modifier.padding(bottom = 8.dp)
-					)
+				Text(
+					text = "Now Playing: ${playlist.name} - Track ${currentIndex + 1} of ${playlist.uris.size}",
+					style = MaterialTheme.typography.labelMedium,
+					modifier = Modifier.padding(bottom = 8.dp)
+				)
+				Column(
+					modifier = Modifier
+						.fillMaxWidth()
+						.clearAndSetSemantics {
+							contentDescription = "Track Progress"
+							setProgress { targetValue ->
+								val targetMs = (targetValue * totalTime).toLong()
+								if (targetMs >= 0) seekToTime(targetMs)
+								true
+							}
+							progressBarRangeInfo = ProgressBarRangeInfo(
+								current = progress,
+								range = 0f..1f
+							)
+							stateDescription = "${formatTime(currentTime)} of ${formatTime(totalTime)}"
+						}
+				) {
 					Slider(
 						value = progress,
 						onValueChange = { 
@@ -1241,7 +1420,7 @@ fun AudioPlayerView(
 							val newPos = (it * exoPlayer.duration).toLong()
 							if (newPos >= 0) seekToTime(newPos)
 						},
-						modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Seek" }
+						modifier = Modifier.fillMaxWidth().clearAndSetSemantics {}
 					)
 					Row(
 						modifier = Modifier.fillMaxWidth(), 
