@@ -3,9 +3,7 @@ import android.content.Intent
 import android.media.audiofx.LoudnessEnhancer
 import android.net.Uri
 import android.os.Bundle
-import android.os.ParcelFileDescriptor
-import android.view.ViewGroup
-import androidx.activity.ComponentActivity
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -49,6 +47,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import com.boostofstudios.fukex.data.AuthType
 import com.boostofstudios.fukex.data.Playlist
 import com.boostofstudios.fukex.data.PlaylistManager
+import com.boostofstudios.fukex.data.PlaylistSecurity
 import com.boostofstudios.fukex.data.PlayerCacheManager
 import com.boostofstudios.fukex.ui.theme.FukeXTheme
 import kotlinx.coroutines.Dispatchers
@@ -75,6 +74,8 @@ import com.boostofstudios.fukex.data.LockTimeout
 import com.boostofstudios.fukex.data.SettingsManager
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+
+private const val TAG = "FukeX"
 
 class MainActivity : FragmentActivity() {
 	override fun onCreate(savedInstanceState: Bundle?) {
@@ -632,8 +633,10 @@ Box(modifier = Modifier.weight(1f)) {
 			confirmButton = {
 				Button(onClick = {
 					if (pinInput.length >= 4) {
-						val newList = playlists.map { 
-							if (it.id == playlist.id) it.copy(isHidden = true, pin = pinInput, authType = setupAuthType) else it 
+						val salt = PlaylistSecurity.newSalt()
+						val hashed = PlaylistSecurity.hash(pinInput, salt)
+						val newList = playlists.map {
+							if (it.id == playlist.id) it.copy(isHidden = true, pinHash = hashed, pinSalt = salt, authType = setupAuthType) else it
 						}
 						playlists = newList
 						scope.launch(Dispatchers.IO) {
@@ -675,17 +678,17 @@ Box(modifier = Modifier.weight(1f)) {
 			},
 			confirmButton = {
 				Button(onClick = {
-					if (pinInput == playlist.pin) {
+					if (PlaylistSecurity.verify(pinInput, playlist)) {
 						val nextUnlockedIds = unlockedPlaylistIds + playlist.id
 						unlockedPlaylistIds = nextUnlockedIds
+						lastActiveTimes = lastActiveTimes + (playlist.id to System.currentTimeMillis())
 						authError = ""
 						pinInput = ""
 						showPinDialog = null
-						// Calculate target index in the next state of visiblePlaylists
 						val nextVisible = playlists.filter { !it.isHidden || it.id in nextUnlockedIds }
 						val targetIdx = nextVisible.indexOfFirst { it.id == playlist.id }
 						if (targetIdx != -1) {
-							selectedTabIndex = targetIdx + 1
+							selectedTabIndex = targetIdx
 						}
 					} else {
 						authError = "Incorrect ${playlist.authType.name}"
@@ -724,9 +727,9 @@ Box(modifier = Modifier.weight(1f)) {
 			},
 			confirmButton = {
 				Button(onClick = {
-					if (pinInput == playlist.pin) {
-						val newList = playlists.map { 
-							if (it.id == playlist.id) it.copy(isHidden = false) else it 
+					if (PlaylistSecurity.verify(pinInput, playlist)) {
+						val newList = playlists.map {
+							if (it.id == playlist.id) it.copy(isHidden = false, pinHash = null, pinSalt = null) else it
 						}
 						playlists = newList
 						unlockedPlaylistIds = unlockedPlaylistIds - playlist.id
