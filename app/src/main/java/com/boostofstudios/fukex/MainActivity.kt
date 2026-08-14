@@ -906,8 +906,41 @@ fun createFukexPlayer(context: android.content.Context): androidx.media3.exoplay
 		.setCache(PlayerCacheManager.getCache(context))
 		.setUpstreamDataSourceFactory(customDataSourceFactory)
 		.setFlags(androidx.media3.datasource.cache.CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+	// Local files are already on disk, so only remote sources go through the cache.
+	val routingDataSourceFactory = androidx.media3.datasource.DataSource.Factory {
+		object : androidx.media3.datasource.DataSource {
+			var delegate: androidx.media3.datasource.DataSource? = null
+			val listeners = mutableListOf<androidx.media3.datasource.TransferListener>()
+
+			override fun addTransferListener(transferListener: androidx.media3.datasource.TransferListener) {
+				listeners.add(transferListener)
+			}
+
+			override fun open(dataSpec: androidx.media3.datasource.DataSpec): Long {
+				val factory = if (dataSpec.uri.scheme?.startsWith("smb") == true) {
+					cacheDataSourceFactory
+				} else {
+					customDataSourceFactory
+				}
+				val source = factory.createDataSource()
+				listeners.forEach { source.addTransferListener(it) }
+				delegate = source
+				return source.open(dataSpec)
+			}
+
+			override fun read(buffer: ByteArray, offset: Int, length: Int): Int =
+				delegate!!.read(buffer, offset, length)
+
+			override fun getUri(): android.net.Uri? = delegate?.uri
+
+			override fun close() {
+				delegate?.close()
+				delegate = null
+			}
+		}
+	}
 	val mediaSourceFactory = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(context)
-		.setDataSourceFactory(cacheDataSourceFactory)
+		.setDataSourceFactory(routingDataSourceFactory)
 	return androidx.media3.exoplayer.ExoPlayer.Builder(context)
 		.setMediaSourceFactory(mediaSourceFactory)
 		.setAudioAttributes(audioAttributes, false)
@@ -944,14 +977,16 @@ fun AudioPlayerView(
 	var currentTime by remember { mutableLongStateOf(0L) }
 	var totalTime by remember { mutableLongStateOf(0L) }
 	var isInitialPlayback by remember { mutableStateOf(true) }
+	var isSeeking by remember { mutableStateOf(false) }
 	var showMoreOptions by remember { mutableStateOf(false) }
 	var showSearchDialog by remember { mutableStateOf(false) }
 	var showInfoDialog by remember { mutableStateOf(false) }
 	var searchQuery by remember { mutableStateOf("") }
 	var playlistSize by remember { mutableLongStateOf(0L) }
+	var unmeasuredTracks by remember { mutableIntStateOf(0) }
 	var amplifierEnabled by remember { mutableStateOf(SettingsManager.isAmplifierEnabled(context)) }
 	var amplifierLevel by remember { mutableIntStateOf(SettingsManager.getAmplifierLevel(context)) }
-	var loudnessEnhancer by remember { mutableStateOf<LoudnessEnhancer?>(null) }
+	val loudnessEnhancers = remember { arrayOfNulls<LoudnessEnhancer>(2) }
 	val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
 	DisposableEffect(lifecycleOwner) {
 		val observer = LifecycleEventObserver { _, event ->
@@ -983,48 +1018,76 @@ fun AudioPlayerView(
 		}
 	}
 
-	fun updateAmplifier(sessionId: Int) {
-		try {
-			loudnessEnhancer?.release()
+	// Both players get their own enhancer, otherwise the boost drops out after a crossfade swap.
+	fun updateAmplifier() {
+		players.forEachIndexed { i, player ->
+			loudnessEnhancers[i]?.release()
+			loudnessEnhancers[i] = null
+			val sessionId = player.audioSessionId
 			if (amplifierEnabled && sessionId != C.AUDIO_SESSION_ID_UNSET && sessionId != 0) {
-				loudnessEnhancer = LoudnessEnhancer(sessionId).apply {
-					setTargetGain(amplifierLevel)
-					enabled = true
+				try {
+					loudnessEnhancers[i] = LoudnessEnhancer(sessionId).apply {
+						setTargetGain(amplifierLevel)
+						enabled = true
+					}
+				} catch (e: Exception) {
+					Log.e(TAG, "Could not attach amplifier to session $sessionId", e)
 				}
-			} else {
-				loudnessEnhancer = null
 			}
-		} catch (e: Exception) {
-			e.printStackTrace()
-			loudnessEnhancer = null
 		}
 	}
 	LaunchedEffect(amplifierEnabled, amplifierLevel) {
-		updateAmplifier(exoPlayer.audioSessionId)
+		updateAmplifier()
 	}
 	LaunchedEffect(showInfoDialog) {
 		if (showInfoDialog) {
-			withContext(Dispatchers.IO) {
+			val result = withContext(Dispatchers.IO) {
 				var totalSize = 0L
+				var unmeasured = 0
 				playlist.uris.forEach { uri ->
-					try {
-						context.contentResolver.openAssetFileDescriptor(uri, "r")?.use {
-							totalSize += it.length
+					val size = when {
+						uri.scheme == "file" -> uri.path?.let { java.io.File(it).length() } ?: 0L
+						uri.scheme?.startsWith("smb") == true -> 0L
+						else -> try {
+							context.contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: 0L
+						} catch (e: Exception) {
+							0L
 						}
-					} catch (e: Exception) {
-						// Ignore files that can't be read
 					}
+					if (size > 0L) totalSize += size else unmeasured++
 				}
-				playlistSize = totalSize
+				totalSize to unmeasured
 			}
+			playlistSize = result.first
+			unmeasuredTracks = result.second
 		}
 	}
 	val volumeAnimators = remember { mutableMapOf<androidx.media3.exoplayer.ExoPlayer, kotlinx.coroutines.Job>() }
+	var duckFactor by remember { mutableFloatStateOf(1f) }
+	val pauseRef = remember { mutableStateOf({}) }
+	val resumeRef = remember { mutableStateOf({}) }
+	val audioFocus = remember {
+		AudioFocusController(
+			context,
+			onPause = { pauseRef.value() },
+			onResume = { resumeRef.value() },
+			onDuck = { ducking -> duckFactor = if (ducking) 0.25f else 1f }
+		)
+	}
+
+	fun setVolume(player: androidx.media3.exoplayer.ExoPlayer, level: Float) {
+		player.volume = level * duckFactor
+	}
+	LaunchedEffect(duckFactor) {
+		players.forEach { player ->
+			if (player.volume > 0f) player.volume = duckFactor
+		}
+	}
 
 	fun startVolumeAnimation(player: androidx.media3.exoplayer.ExoPlayer, from: Float, to: Float, durationMs: Long, onEnd: () -> Unit = {}) {
 		volumeAnimators[player]?.cancel()
 		if (durationMs <= 0) {
-			player.volume = to
+			setVolume(player, to)
 			onEnd()
 			return
 		}
@@ -1033,13 +1096,13 @@ fun AudioPlayerView(
 			while (true) {
 				val elapsed = System.currentTimeMillis() - startTime
 				if (elapsed >= durationMs) {
-					player.volume = to
+					setVolume(player, to)
 					onEnd()
 					break
 				}
 				val fraction = elapsed.toFloat() / durationMs.toFloat()
-				player.volume = from + (to - from) * fraction
-				kotlinx.coroutines.delay(16) // ~60fps
+				setVolume(player, from + (to - from) * fraction)
+				kotlinx.coroutines.delay(16)
 			}
 		}
 		volumeAnimators[player] = job
@@ -1048,6 +1111,7 @@ fun AudioPlayerView(
 	fun playIndex(index: Int, play: Boolean = true) {
 		isInitialPlayback = false
 		if (index in playlist.uris.indices) {
+			if (play && !audioFocus.requestFocus()) return
 			val fadeOutManual = SettingsManager.getFadeOutManual(context).toLong()
 			val fadeInManual = SettingsManager.getFadeInManual(context).toLong()
 			val startPlayback = { p: androidx.media3.exoplayer.ExoPlayer ->
@@ -1059,7 +1123,7 @@ fun AudioPlayerView(
 					p.playWhenReady = true
 					startVolumeAnimation(p, 0f, 1f, fadeInManual)
 				} else {
-					p.volume = 1f
+					setVolume(p, 1f)
 				}
 			}
 			if (fadeOutManual > 0 && isPlaying) {
@@ -1111,6 +1175,7 @@ fun AudioPlayerView(
 	}
 
 	fun startPlayback() {
+		if (!audioFocus.requestFocus()) return
 		if (exoPlayer.playbackState == androidx.media3.common.Player.STATE_IDLE) {
 			exoPlayer.prepare()
 		}
@@ -1119,9 +1184,13 @@ fun AudioPlayerView(
 			exoPlayer.play()
 			startVolumeAnimation(exoPlayer, 0f, 1f, fadeInPause)
 		} else {
-			exoPlayer.volume = 1f
+			setVolume(exoPlayer, 1f)
 			exoPlayer.play()
 		}
+	}
+	SideEffect {
+		pauseRef.value = { pausePlayback() }
+		resumeRef.value = { startPlayback() }
 	}
 
 	fun seekToTime(pos: Long) {
@@ -1294,14 +1363,12 @@ fun AudioPlayerView(
 				}
 
 				override fun onAudioSessionIdChanged(audioSessionId: Int) {
-					if (player == players[activePlayerIndex]) {
-						updateAmplifier(audioSessionId)
-					}
+					updateAmplifier()
 				}
 
 				override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
 					val cause = error.cause?.message ?: "Unknown cause"
-					error.printStackTrace()
+					Log.e(TAG, "Playback failed: ${error.errorCodeName}", error)
 					if (player == players[activePlayerIndex]) {
 						if (SettingsManager.isSkipUnavailableTracksEnabled(context)) {
 							android.widget.Toast.makeText(context, "Skipping unavailable track...", android.widget.Toast.LENGTH_SHORT).show()
@@ -1321,7 +1388,11 @@ fun AudioPlayerView(
 		}
 		players.forEachIndexed { i, p -> p.addListener(listeners[i]) }
 		onDispose {
-			loudnessEnhancer?.release()
+			audioFocus.abandonFocus()
+			loudnessEnhancers.forEachIndexed { i, enhancer ->
+				enhancer?.release()
+				loudnessEnhancers[i] = null
+			}
 			players.forEach { it.release() }
 		}
 	}
