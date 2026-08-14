@@ -33,13 +33,12 @@ import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.documentfile.provider.DocumentFile
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
@@ -55,11 +54,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import androidx.media3.common.MediaItem
-import androidx.media3.common.Player
 import androidx.media3.common.C
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.PlayerView
 import java.io.OutputStreamWriter
 import java.util.UUID
 import androidx.fragment.app.FragmentActivity
@@ -94,16 +89,31 @@ class MainActivity : FragmentActivity() {
 @Composable
 fun MainScreen(modifier: Modifier = Modifier) {
 	val context = LocalContext.current
-	val scope = rememberCoroutineScope()
-	var playlists by remember { 
-		mutableStateOf(PlaylistManager.loadPlaylists(context).let {
-			if (it.isEmpty()) listOf(Playlist(UUID.randomUUID().toString(), "Default Playlist", emptyList())) else it
-		})
+	var loaded by remember { mutableStateOf<List<Playlist>?>(null) }
+	LaunchedEffect(Unit) {
+		val stored = withContext(Dispatchers.IO) { PlaylistManager.loadPlaylists(context) }
+		loaded = stored.ifEmpty {
+			listOf(Playlist(UUID.randomUUID().toString(), "Default Playlist", emptyList()))
+		}
 	}
-	var selectedTabIndex by remember { mutableIntStateOf(0) }
+	val initialPlaylists = loaded
+	if (initialPlaylists == null) {
+		Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+			CircularProgressIndicator()
+		}
+		return
+	}
+	MainScreenContent(initialPlaylists, modifier)
+}
+
+@Composable
+private fun MainScreenContent(initialPlaylists: List<Playlist>, modifier: Modifier = Modifier) {
+	val context = LocalContext.current
+	val scope = rememberCoroutineScope()
+	var playlists by remember { mutableStateOf(initialPlaylists) }
+	var selectedTabIndex by rememberSaveable { mutableIntStateOf(0) }
 	var showNameDialog by remember { mutableStateOf(false) }
 	var playlistName by remember { mutableStateOf("") }
-	var isScanning by remember { mutableStateOf(false) }
 	var showPlaylistActions by remember { mutableStateOf<Playlist?>(null) }
 	var showPinDialog by remember { mutableStateOf<Playlist?>(null) }
 	var pinInput by remember { mutableStateOf("") }
@@ -118,6 +128,7 @@ fun MainScreen(modifier: Modifier = Modifier) {
 	var showAddMediaDialog by remember { mutableStateOf(false) }
 	var showSettings by remember { mutableStateOf(false) }
 	var showExitDialog by remember { mutableStateOf(false) }
+	var showStorageRationale by remember { mutableStateOf(false) }
 	var lastActiveTimes by remember { mutableStateOf(mapOf<String, Long>()) }
 	var currentlyPlayingPlaylistId by remember { mutableStateOf<String?>(null) }
 	val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
@@ -145,9 +156,9 @@ fun MainScreen(modifier: Modifier = Modifier) {
 			}
 		)
 	}
-	LaunchedEffect(unlockedPlaylistIds, currentlyPlayingPlaylistId, lastActiveTimes) {
+	LaunchedEffect(Unit) {
 		while (true) {
-			kotlinx.coroutines.delay(10000) // Check every 10 seconds
+			kotlinx.coroutines.delay(10000)
 			val timeout = SettingsManager.getLockTimeout(context)
 			if (timeout != LockTimeout.IMMEDIATE && timeout != LockTimeout.SCREEN_LOCK) {
 				val now = System.currentTimeMillis()
@@ -217,12 +228,31 @@ fun MainScreen(modifier: Modifier = Modifier) {
 			permissionsLauncher.launch(permsToRequest.toTypedArray())
 		}
 		if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-			if (!android.os.Environment.isExternalStorageManager()) {
-				val intent = Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
-				intent.data = Uri.parse("package:${context.packageName}")
-				context.startActivity(intent)
-			}
+			showStorageRationale = !android.os.Environment.isExternalStorageManager()
 		}
+	}
+	if (showStorageRationale) {
+		AlertDialog(
+			modifier = Modifier.semantics { paneTitle = "Storage access needed" },
+			onDismissRequest = { showStorageRationale = false },
+			title = { Text("Storage access needed") },
+			text = { Text("FukeX uses its own file picker so it works properly with TalkBack. To browse your music, Android needs to grant it access to all files. You can skip this and still play from an SMB share.") },
+			confirmButton = {
+				Button(onClick = {
+					showStorageRationale = false
+					try {
+						val intent = Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
+						intent.data = Uri.parse("package:${context.packageName}")
+						context.startActivity(intent)
+					} catch (e: Exception) {
+						Log.e(TAG, "Could not open all files access settings", e)
+					}
+				}) { Text("Open settings") }
+			},
+			dismissButton = {
+				TextButton(onClick = { showStorageRationale = false }) { Text("Not now") }
+			}
+		)
 	}
 	val visiblePlaylists = playlists.filter { !it.isHidden || it.id in unlockedPlaylistIds }
 	val importLauncher = rememberLauncherForActivityResult(
@@ -251,10 +281,11 @@ fun MainScreen(modifier: Modifier = Modifier) {
 						withContext(Dispatchers.IO) {
 							PlaylistManager.savePlaylists(context, newList)
 						}
-						selectedTabIndex = newList.count { !it.isHidden || it.id in unlockedPlaylistIds }
+						selectedTabIndex = newList.count { !it.isHidden || it.id in unlockedPlaylistIds } - 1
 					}
 				} catch (e: Exception) {
-					e.printStackTrace()
+					Log.e(TAG, "Could not import playlist", e)
+					android.widget.Toast.makeText(context, "That file is not a FukeX playlist.", android.widget.Toast.LENGTH_LONG).show()
 				}
 			}
 		}
@@ -277,7 +308,7 @@ fun MainScreen(modifier: Modifier = Modifier) {
 							}
 						}
 					} catch (e: Exception) {
-						e.printStackTrace()
+						Log.e(TAG, "Could not export playlist", e)
 					}
 				}
 			}
@@ -312,9 +343,6 @@ fun MainScreen(modifier: Modifier = Modifier) {
 		}
 	) { scaffoldPadding ->
 		Column(modifier = modifier.fillMaxSize().padding(scaffoldPadding).semantics { traversalIndex = -1f }) {
-		if (isScanning) {
-			LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-		}
 		val safeSelectedTabIndex = kotlin.math.min(selectedTabIndex, visiblePlaylists.lastIndex).coerceAtLeast(0)
 		ScrollableTabRow(
 			selectedTabIndex = safeSelectedTabIndex,
@@ -1271,7 +1299,7 @@ fun AudioPlayerView(
 			).setState(state, PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, 1.0f)
 			.build()
 		mediaSession.setPlaybackState(playbackState)
-		val trackName = if (currentIndex in playlist.uris.indices) playlist.uris[currentIndex].lastPathSegment ?: "Track ${currentIndex + 1}" else "Unknown"
+		val trackName = if (currentIndex in playlist.uris.indices) trackTitle(playlist.uris[currentIndex], currentIndex) else "Unknown"
 		val metadata = MediaMetadataCompat.Builder()
 			.putString(MediaMetadataCompat.METADATA_KEY_TITLE, trackName)
 			.putString(MediaMetadataCompat.METADATA_KEY_ARTIST, playlist.name)
@@ -1298,14 +1326,18 @@ fun AudioPlayerView(
 	}
 	LaunchedEffect(currentIndex, isPlaying) {
 		var isFadingOut = false
+		val fadeOutAuto = SettingsManager.getFadeOutAuto(context).toLong()
+		val fadeInAuto = SettingsManager.getFadeInAuto(context).toLong()
+		// Tighter polling only pays off when we have to catch the crossfade window.
+		val tick = if (fadeOutAuto > 0) 50L else 250L
 		while (isPlaying) {
-			val fadeOutAuto = SettingsManager.getFadeOutAuto(context).toLong()
-			val fadeInAuto = SettingsManager.getFadeInAuto(context).toLong()
 			val pos = exoPlayer.currentPosition
 			val dur = exoPlayer.duration
-			currentTime = pos
 			totalTime = if (dur > 0) dur else 0L
-			progress = if (dur > 0) pos.toFloat() / dur.toFloat() else 0f
+			if (!isSeeking) {
+				currentTime = pos
+				progress = if (dur > 0) pos.toFloat() / dur.toFloat() else 0f
+			}
 			if (fadeOutAuto > 0 && dur > 0 && (dur - pos) <= fadeOutAuto && !isFadingOut) {
 				isFadingOut = true
 				val nextIndex = currentIndex + 1
@@ -1321,7 +1353,7 @@ fun AudioPlayerView(
 					}
 				}
 			}
-			kotlinx.coroutines.delay(50)
+			kotlinx.coroutines.delay(tick)
 		}
 	}
 	LaunchedEffect(currentIndex, isPlaying) {
@@ -1404,7 +1436,7 @@ fun AudioPlayerView(
 				ListItem(
 					headlineContent = {
 						Text(
-							uri.lastPathSegment ?: "Track ${index + 1}",
+							trackTitle(uri, index),
 							color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
 						)
 					},
@@ -1490,9 +1522,14 @@ fun AudioPlayerView(
 				) {
 					Slider(
 						value = progress,
-						onValueChange = { 
+						onValueChange = {
+							isSeeking = true
 							progress = it
-							val newPos = (it * exoPlayer.duration).toLong()
+							currentTime = (it * totalTime).toLong()
+						},
+						onValueChangeFinished = {
+							isSeeking = false
+							val newPos = (progress * exoPlayer.duration).toLong()
 							if (newPos >= 0) seekToTime(newPos)
 						},
 						modifier = Modifier.fillMaxWidth().clearAndSetSemantics {}
@@ -1620,11 +1657,11 @@ fun AudioPlayerView(
 					)
 					Spacer(Modifier.height(8.dp))
 					val filteredTracks = playlist.uris.mapIndexed { index, uri -> index to uri }
-						.filter { it.second.lastPathSegment?.contains(searchQuery, ignoreCase = true) == true }
+						.filter { trackTitle(it.second, it.first).contains(searchQuery, ignoreCase = true) }
 					LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
 						items(filteredTracks) { (index, uri) ->
 							ListItem(
-								headlineContent = { Text(uri.lastPathSegment ?: "Track ${index + 1}") },
+								headlineContent = { Text(trackTitle(uri, index)) },
 								modifier = Modifier.clickable {
 									playIndex(index)
 									showSearchDialog = false
@@ -1650,7 +1687,10 @@ fun AudioPlayerView(
 					Text("Name: ${playlist.name}")
 					Text("Total Tracks: ${playlist.uris.size}")
 					Text("Total Size: ${formatSize(playlistSize)}")
-					Text("Encrypted: No")
+					if (unmeasuredTracks > 0) {
+						Text("$unmeasuredTracks track(s) could not be measured, such as tracks on an SMB share.")
+					}
+					Text("Locked: ${if (playlist.isHidden) "Yes" else "No"}")
 				}
 			},
 			confirmButton = {
@@ -1661,10 +1701,20 @@ fun AudioPlayerView(
 }
 
 fun formatTime(ms: Long): String {
-	val totalSeconds = ms / 1000
-	val minutes = totalSeconds / 60
+	val totalSeconds = if (ms > 0) ms / 1000 else 0
+	val hours = totalSeconds / 3600
+	val minutes = (totalSeconds % 3600) / 60
 	val seconds = totalSeconds % 60
-	return "%02d:%02d".format(minutes, seconds)
+	return if (hours > 0) {
+		"%d:%02d:%02d".format(hours, minutes, seconds)
+	} else {
+		"%02d:%02d".format(minutes, seconds)
+	}
+}
+
+fun trackTitle(uri: Uri, index: Int): String {
+	val name = uri.lastPathSegment?.let { Uri.decode(it) }?.takeIf { it.isNotBlank() }
+	return name?.substringBeforeLast('.')?.takeIf { it.isNotBlank() } ?: "Track ${index + 1}"
 }
 
 fun formatSize(size: Long): String {
