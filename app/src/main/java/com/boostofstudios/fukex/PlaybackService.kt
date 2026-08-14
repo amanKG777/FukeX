@@ -32,7 +32,12 @@ class PlaybackService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent == null) return START_NOT_STICKY
+        if (intent == null || activeMediaSession == null) {
+            goForeground(buildNotification(false, "FukeX", "Unknown"))
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+            return START_NOT_STICKY
+        }
         if (intent.action == Intent.ACTION_MEDIA_BUTTON) {
             activeMediaSession?.takeIf { it.isActive }?.let { session ->
                 androidx.media.session.MediaButtonReceiver.handleIntent(session, intent)
@@ -44,37 +49,23 @@ class PlaybackService : Service() {
             ACTION_PREV -> activeMediaSession?.takeIf { it.isActive }?.controller?.transportControls?.skipToPrevious()
             ACTION_STOP -> {
                 activeMediaSession?.takeIf { it.isActive }?.controller?.transportControls?.stop()
-                // Call startForeground with a dummy/empty notification to satisfy the foreground contract
-                // before stopping, just in case this intent was delivered after a startForegroundService call
-                // but before startForeground was called, or if the system gets confused.
-                val title = try { activeMediaSession?.takeIf { it.isActive }?.controller?.metadata?.getString(android.support.v4.media.MediaMetadataCompat.METADATA_KEY_TITLE) } catch (e: Exception) { null } ?: "FukeX"
-                val author = try { activeMediaSession?.takeIf { it.isActive }?.controller?.metadata?.getString(android.support.v4.media.MediaMetadataCompat.METADATA_KEY_ARTIST) } catch (e: Exception) { null } ?: "Unknown"
-                val notification = buildNotification(false, title, author)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    startForeground(NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
-                } else {
-                    startForeground(NOTIFICATION_ID, notification)
-                }
+                // startForeground before stopping, in case this arrived after a startForegroundService call.
+                val title = sessionMetadata(android.support.v4.media.MediaMetadataCompat.METADATA_KEY_TITLE) ?: "FukeX"
+                val author = sessionMetadata(android.support.v4.media.MediaMetadataCompat.METADATA_KEY_ARTIST) ?: "Unknown"
+                goForeground(buildNotification(false, title, author))
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
                 return START_NOT_STICKY
             }
         }
         val isPlaying = try { intent.getBooleanExtra(EXTRA_IS_PLAYING, activeMediaSession?.takeIf { it.isActive }?.controller?.playbackState?.state == android.support.v4.media.session.PlaybackStateCompat.STATE_PLAYING) } catch (e: Exception) { false }
-        val sessionTitle = try { activeMediaSession?.takeIf { it.isActive }?.controller?.metadata?.getString(android.support.v4.media.MediaMetadataCompat.METADATA_KEY_TITLE) } catch (e: Exception) { null }
-        val sessionAuthor = try { activeMediaSession?.takeIf { it.isActive }?.controller?.metadata?.getString(android.support.v4.media.MediaMetadataCompat.METADATA_KEY_ARTIST) } catch (e: Exception) { null }
-        val title = intent.getStringExtra(EXTRA_TITLE)?.takeIf { it.isNotBlank() } 
-            ?: sessionTitle?.takeIf { it.isNotBlank() } 
+        val title = intent.getStringExtra(EXTRA_TITLE)?.takeIf { it.isNotBlank() }
+            ?: sessionMetadata(android.support.v4.media.MediaMetadataCompat.METADATA_KEY_TITLE)
             ?: "FukeX"
-        val author = intent.getStringExtra(EXTRA_AUTHOR)?.takeIf { it.isNotBlank() } 
-            ?: sessionAuthor?.takeIf { it.isNotBlank() } 
+        val author = intent.getStringExtra(EXTRA_AUTHOR)?.takeIf { it.isNotBlank() }
+            ?: sessionMetadata(android.support.v4.media.MediaMetadataCompat.METADATA_KEY_ARTIST)
             ?: "Unknown"
-        val notification = buildNotification(isPlaying, title, author)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
-        }
+        goForeground(buildNotification(isPlaying, title, author))
         if (!isPlaying) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 stopForeground(STOP_FOREGROUND_DETACH)
@@ -83,7 +74,21 @@ class PlaybackService : Service() {
                 stopForeground(false)
             }
         }
-        return START_STICKY
+        return START_NOT_STICKY
+    }
+
+    private fun sessionMetadata(key: String): String? = try {
+        activeMediaSession?.takeIf { it.isActive }?.controller?.metadata?.getString(key)?.takeIf { it.isNotBlank() }
+    } catch (e: Exception) {
+        null
+    }
+
+    private fun goForeground(notification: Notification) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
     }
 
     private fun buildNotification(isPlaying: Boolean, title: String, author: String): Notification {
@@ -92,7 +97,7 @@ class PlaybackService : Service() {
             this, 0, mainIntent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_media_play) // Fallback icon
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(author)
             .setContentIntent(pendingMainIntent)
@@ -140,6 +145,11 @@ class PlaybackService : Service() {
             val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             manager.createNotificationChannel(channel)
         }
+    }
+
+    override fun onDestroy() {
+        activeMediaSession = null
+        super.onDestroy()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
