@@ -293,7 +293,7 @@ fun SettingsScreen(
 				SettingsHeader("About")
 				ListItem(
 					headlineContent = { Text("About FukeX") },
-					supportingContent = { Text("Version 0.0.1, Copyright info, and license") },
+					supportingContent = { Text("Version ${BuildConfig.VERSION_NAME}, Copyright info, and license") },
 					leadingContent = { Icon(Icons.Default.Info, null) },
 					modifier = Modifier.clickable { showAboutScreen = true }
 				)
@@ -373,7 +373,7 @@ fun AboutScreen(onBack: () -> Unit) {
 				.padding(16.dp),
 			verticalArrangement = Arrangement.spacedBy(16.dp)
 		) {
-			Text("FukeX version 0.0.1", style = MaterialTheme.typography.headlineMedium)
+			Text("FukeX version ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.headlineMedium)
 			HorizontalDivider()
 			Text(
 				"Copyright (C) This project is copyrighted under the BoostOf Studios Creation Copyright 2026",
