@@ -866,12 +866,13 @@ fun createFukexPlayer(context: android.content.Context): androidx.media3.exoplay
 		.setUsage(androidx.media3.common.C.USAGE_MEDIA)
 		.setContentType(androidx.media3.common.C.AUDIO_CONTENT_TYPE_MUSIC)
 		.build()
+	val appContext = context.applicationContext
 	val defaultDataSourceFactory = androidx.media3.datasource.DefaultDataSource.Factory(context)
 	val customDataSourceFactory = androidx.media3.datasource.DataSource.Factory {
 		val defaultDataSource = defaultDataSourceFactory.createDataSource()
 
 		object : androidx.media3.datasource.DataSource {
-			val smbDataSource = com.boostofstudios.fukex.data.SmbDataSource()
+			val smbDataSource = com.boostofstudios.fukex.data.SmbDataSource(appContext)
 			var activeDataSource: androidx.media3.datasource.DataSource? = null
 
 			override fun addTransferListener(transferListener: androidx.media3.datasource.TransferListener) {

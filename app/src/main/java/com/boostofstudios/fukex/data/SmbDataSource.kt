@@ -1,4 +1,5 @@
 package com.boostofstudios.fukex.data
+import android.content.Context
 import android.net.Uri
 import androidx.media3.common.C
 import androidx.media3.datasource.BaseDataSource
@@ -8,7 +9,7 @@ import jcifs.smb.SmbRandomAccessFile
 import java.io.EOFException
 import java.io.IOException
 
-class SmbDataSource : BaseDataSource(true) {
+class SmbDataSource(private val appContext: Context) : BaseDataSource(true) {
     private var file: SmbFile? = null
     private var randomAccessFile: SmbRandomAccessFile? = null
     private var inputStream: java.io.InputStream? = null
@@ -20,24 +21,12 @@ class SmbDataSource : BaseDataSource(true) {
         uri = dataSpec.uri
         transferInitializing(dataSpec)
         try {
-            val smbUriStr = uri.toString()
-            val parsedUri = android.net.Uri.parse(smbUriStr)
-            val userInfo = parsedUri.userInfo
-            val context = if (userInfo != null) {
-                val parts = userInfo.split(":", limit = 2)
-                val decodedUser = java.net.URLDecoder.decode(parts[0], "UTF-8")
-                val decodedPass = if (parts.size > 1) java.net.URLDecoder.decode(parts[1], "UTF-8") else ""
-                val domain = if (decodedUser.contains(";")) decodedUser.substringBefore(";") else null
-                val actualUser = if (decodedUser.contains(";")) decodedUser.substringAfter(";") else decodedUser
-                val auth = jcifs.smb.NtlmPasswordAuthenticator(domain, actualUser, decodedPass)
-                SmbConfig.baseContext.withCredentials(auth)
-            } else {
-                SmbConfig.baseContext
-            }
-            file = SmbFile(smbUriStr, context)
-            val isSmbFile = file
-            if (isSmbFile == null) throw IOException("Failed to create SmbFile")
-            randomAccessFile = SmbRandomAccessFile(isSmbFile, "r")
+            val target = dataSpec.uri
+            val stored = SmbCredentialStore.load(appContext, target)
+            val context = SmbConfig.contextFor(stored?.username, stored?.password)
+            file = SmbFile(target.toString(), context)
+            val smbFile = file ?: throw IOException("Failed to create SmbFile")
+            randomAccessFile = SmbRandomAccessFile(smbFile, "r")
             randomAccessFile!!.seek(dataSpec.position)
             inputStream = java.io.BufferedInputStream(object : java.io.InputStream() {
                 override fun read(): Int {
@@ -48,7 +37,7 @@ class SmbDataSource : BaseDataSource(true) {
                 override fun read(b: ByteArray, off: Int, len: Int): Int {
                     return randomAccessFile!!.read(b, off, len)
                 }
-            }, 1024 * 256) // 256 KB buffer
+            }, 1024 * 256)
             bytesRemaining = if (dataSpec.length != C.LENGTH_UNSET.toLong()) {
                 dataSpec.length
             } else {
@@ -75,12 +64,7 @@ class SmbDataSource : BaseDataSource(true) {
         } else {
             Math.min(bytesRemaining, readLength.toLong()).toInt()
         }
-        val bytesRead: Int
-        try {
-            bytesRead = inputStream!!.read(buffer, offset, bytesToRead)
-        } catch (e: IOException) {
-            throw e
-        }
+        val bytesRead = inputStream!!.read(buffer, offset, bytesToRead)
         if (bytesRead == -1) {
             if (bytesRemaining != C.LENGTH_UNSET.toLong()) {
                 throw EOFException()
@@ -103,11 +87,10 @@ class SmbDataSource : BaseDataSource(true) {
         try {
             inputStream?.close()
             randomAccessFile?.close()
-        } catch (e: IOException) {
-            throw e
         } finally {
             inputStream = null
             randomAccessFile = null
+            file = null
             if (opened) {
                 opened = false
                 transferEnded()
