@@ -18,14 +18,11 @@ import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.boostofstudios.fukex.data.isMediaFile
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-
-fun File.isMediaFile(): Boolean {
-	val ext = extension.lowercase()
-	return ext in listOf("mp3", "mp4", "flac", "wav", "m4a", "aac", "ogg", "mkv", "webm", "opus", "alac")
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,17 +31,16 @@ fun FilePickerScreen(
 	onCancel: () -> Unit
 ) {
 	val root = Environment.getExternalStorageDirectory()
+	val scope = rememberCoroutineScope()
 	var currentDir by remember { mutableStateOf(root) }
 	var files by remember { mutableStateOf<List<File>>(emptyList()) }
 	var isScanning by remember { mutableStateOf(false) }
 	LaunchedEffect(currentDir) {
-		withContext(Dispatchers.IO) {
-			val listed = currentDir.listFiles()
-			if (listed != null) {
-				files = listed.filter { !it.isHidden }.sortedWith(compareBy({ !it.isDirectory }, { it.name.lowercase() }))
-			} else {
-				files = emptyList()
-			}
+		files = withContext(Dispatchers.IO) {
+			currentDir.listFiles()
+				?.filter { !it.isHidden }
+				?.sortedWith(compareBy({ !it.isDirectory }, { it.name.lowercase() }))
+				?: emptyList()
 		}
 	}
 	BackHandler {
@@ -112,15 +108,16 @@ fun FilePickerScreen(
 									customActions = listOf(
 										CustomAccessibilityAction("Add entire folder") {
 											isScanning = true
-											Thread {
-												val mediaFiles = file.walkTopDown()
-													.filter { it.isFile && it.isMediaFile() }
-													.map { Uri.fromFile(it) }
-													.toList()
-												android.os.Handler(android.os.Looper.getMainLooper()).post {
-													onFilesSelected(mediaFiles)
+											scope.launch {
+												val mediaFiles = withContext(Dispatchers.IO) {
+													file.walkTopDown()
+														.filter { it.isFile && it.isMediaFile() }
+														.map { Uri.fromFile(it) }
+														.toList()
 												}
-											}.start()
+												isScanning = false
+												onFilesSelected(mediaFiles)
+											}
 											true
 										}
 									)
