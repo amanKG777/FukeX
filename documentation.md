@@ -116,7 +116,7 @@ The bottom part is the playback bar, and it holds:
 
 * Play / Pause button.
 
-* More options: Search, playlist info, amplifier toggle, and the hide and remove actions for this playlist.
+* More options: Search, playlist info, amplifier toggle, playback effects, and the hide and remove actions for this playlist.
 
 FukeX saves your position roughly every five seconds and again whenever you leave a playlist. Come back later and it picks up the same track, at the same second.
 
@@ -290,6 +290,24 @@ Set the level in settings, from 0 up to 25 dB in 5 dB steps. Then switch it on o
 
 Above 15 dB, FukeX shows a warning before applying it. That warning is not decoration. Pushing a small phone speaker that hard for a long time can genuinely damage it, and heavily boosted audio tends to distort. 20 dB is our sweet spot, 25 dB is there for the brave.
 
+## Playback effects: speed, pitch and bass boost
+
+Sometimes you want a track a little faster, a lecture a little slower, or just more thump in your headphones. Open the 3-dots menu in the playback bar and choose "Playback Effects" for three sliders in one dialog:
+
+* Playback Speed: From 0.5x up to 2x. Slow down a podcast to catch every word, or speed through an audiobook you've already heard a hundred times.
+
+* Playback Pitch: Also 0.5x up to 2x, and it's independent of speed, so you can change one without dragging the other along with it.
+
+* Bass Boost: Off by default, up to a level of 1000 in steps of 100. Turn it up when your headphones just aren't giving you the low end you want.
+
+All three take effect immediately and are remembered the next time you open FukeX, so you only have to set them once.
+
+## Evening out the volume between tracks
+
+Ever get blasted by one song right after a quiet one? That's what ReplayGain is for. Turn on "Enable ReplayGain" in settings, under Playback, and FukeX will read the volume tag that most music library tools already write into your files, then adjust each track to a consistent loudness on the fly.
+
+It's off by default, since not every file has the tag, but if you've got a mixed playlist and keep reaching for the volume button, switch it on and forget about it. Tracks without the tag just play at their normal volume.
+
 ## Fading and gapless playback
 
 This is what gives FukeX that DJ feel. Rather than one blunt crossfade setting, you get to choose a fade time for each event separately.
@@ -337,6 +355,8 @@ In the settings screen, you'll see the following options, grouped under headings
 * Skip Unavailable Tracks: Automatically skips any media that fails to load or cannot be played, and shows a short "Skipping unavailable track" message. Useful for SMB playlists where the server might be asleep. With it off, FukeX stops and tells you exactly what went wrong instead, which is what you want when you're trying to work out why something won't play.
 
 * Amplifier Boost: Adjust the volume boost from 0 up to 25 dB, though a warning pops up above 15 dB.
+
+* Enable ReplayGain: Automatically levels out the volume between quiet and loud tracks, using the ReplayGain tag your files already carry if your music library tool wrote one. Off by default.
 
 ### Fading (Gapless Playback)
 
@@ -388,8 +408,8 @@ On a playlist tab: Create new playlist, Move Left, Move Right, Hide or Unlock, E
 
 On a track in the list: Move Up, Move Down, Remove.
 
-On the More options button: Search within playlist, Playlist info, Enable or Disable Amplifier, Hide or Unlock, Remove.
+On the More options button: Search within playlist, Playlist info, Enable or Disable Amplifier, Playback Effects, Hide or Unlock, Remove.
 
 On a folder in the file picker or SMB picker: Add entire folder.
 
-On the seek slider and every settings slider: swipe up and down to change the value. The slider reads out its current value as you go, in minutes and seconds for the seek bar, in decibels for the amplifier, and in milliseconds for the fade settings.
+On the seek slider and every settings slider: swipe up and down to change the value. The slider reads out its current value as you go, in minutes and seconds for the seek bar, in decibels for the amplifier, in milliseconds for the fade settings, and as a multiplier or a plain level for the playback effects sliders.
