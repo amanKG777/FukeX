@@ -1065,6 +1065,8 @@ fun AudioPlayerView(
 					enabled = true
 				}
 			}
+		} catch (e: Exception) {
+			e.printStackTrace()
 		}
 	}
 	fun updateBassBoost(sessionId: Int) {
@@ -1132,7 +1134,7 @@ fun AudioPlayerView(
 		}
 	}
 	LaunchedEffect(amplifierEnabled, amplifierLevel) {
-		updateAmplifier()
+		updateAmplifier(exoPlayer.audioSessionId)
 	}
 	LaunchedEffect(bassBoostLevel) {
 		updateBassBoost(exoPlayer.audioSessionId)
@@ -1469,7 +1471,7 @@ fun AudioPlayerView(
 				}
 
 				override fun onAudioSessionIdChanged(audioSessionId: Int) {
-					updateAmplifier()
+					updateAmplifier(audioSessionId)
 				}
 
 				override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
@@ -1495,10 +1497,10 @@ fun AudioPlayerView(
 		players.forEachIndexed { i, p -> p.addListener(listeners[i]) }
 		onDispose {
 			audioFocus.abandonFocus()
-			loudnessEnhancers.forEachIndexed { i, enhancer ->
-				enhancer?.release()
-				loudnessEnhancers[i] = null
-			}
+			loudnessEnhancer?.release()
+			loudnessEnhancer = null
+			bassBoostEffect?.release()
+			bassBoostEffect = null
 			players.forEach { it.release() }
 		}
 	}

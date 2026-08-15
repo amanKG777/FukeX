@@ -58,14 +58,12 @@ object PlaylistManager {
 				if (pinHash == null && legacyPin != null) {
 					pinSalt = PlaylistSecurity.newSalt()
 					pinHash = PlaylistSecurity.hash(legacyPin, pinSalt)
-					needsRewrite = true
 				}
 				val urisJson = jsonObject.getJSONArray("uris")
 				val uris = mutableListOf<Uri>()
 				for (j in 0 until urisJson.length()) {
 					val parsed = Uri.parse(urisJson.getString(j))
 					val cleaned = SmbCredentialStore.migrateLegacyUri(context, parsed)
-					if (cleaned != parsed) needsRewrite = true
 					uris.add(cleaned)
 				}
 				playlists.add(Playlist(id, name, uris, lastIndex, lastPosition, isHidden, pinHash, pinSalt, authType))
@@ -85,7 +83,8 @@ object PlaylistManager {
 		jsonObject.put("lastIndex", playlist.lastIndex)
 		jsonObject.put("lastPosition", playlist.lastPosition.toDouble())
 		jsonObject.put("isHidden", playlist.isHidden)
-		jsonObject.put("pin", playlist.pin ?: "")
+		jsonObject.put("pinHash", playlist.pinHash ?: "")
+		jsonObject.put("pinSalt", playlist.pinSalt ?: "")
 		jsonObject.put("authType", playlist.authType.name)
 		val urisJson = JSONArray()
 		playlist.uris.forEach { urisJson.put(it.toString()) }
@@ -99,7 +98,8 @@ object PlaylistManager {
 		val lastIndex = jsonObject.optInt("lastIndex", 0)
 		val lastPosition = jsonObject.optDouble("lastPosition", 0.0).toFloat()
 		val isHidden = jsonObject.optBoolean("isHidden", false)
-		val pin = jsonObject.optString("pin", "").takeIf { it.isNotEmpty() }
+		val pinHash = jsonObject.optString("pinHash", "").takeIf { it.isNotEmpty() }
+		val pinSalt = jsonObject.optString("pinSalt", "").takeIf { it.isNotEmpty() }
 		val authTypeStr = jsonObject.optString("authType", AuthType.PIN.name)
 		val authType = try { AuthType.valueOf(authTypeStr) } catch (e: Exception) { AuthType.PIN }
 		val urisJson = jsonObject.getJSONArray("uris")
@@ -107,7 +107,7 @@ object PlaylistManager {
 		for (j in 0 until urisJson.length()) {
 			uris.add(Uri.parse(urisJson.getString(j)))
 		}
-		return Playlist(id, name, uris, lastIndex, lastPosition, isHidden, pin, authType)
+		return Playlist(id, name, uris, lastIndex, lastPosition, isHidden, pinHash, pinSalt, authType)
 	}
 
 	fun savePlaylists(context: Context, playlists: List<Playlist>) {
@@ -163,10 +163,7 @@ object PlaylistManager {
 				}
 			}
 		} catch (e: Exception) {
-			Log.e(TAG, "Could not parse playlists", e)
-		}
-		if (needsRewrite) {
-			writeLocked(context, toJson(playlists))
+			Log.e("PlaylistManager", "Could not parse playlists", e)
 		}
 		return playlists
 	}
