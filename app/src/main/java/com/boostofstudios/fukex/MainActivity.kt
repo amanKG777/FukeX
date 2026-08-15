@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
@@ -1014,7 +1015,14 @@ fun AudioPlayerView(
 	var unmeasuredTracks by remember { mutableIntStateOf(0) }
 	var amplifierEnabled by remember { mutableStateOf(SettingsManager.isAmplifierEnabled(context)) }
 	var amplifierLevel by remember { mutableIntStateOf(SettingsManager.getAmplifierLevel(context)) }
-	val loudnessEnhancers = remember { arrayOfNulls<LoudnessEnhancer>(2) }
+	var loudnessEnhancer by remember { mutableStateOf<android.media.audiofx.LoudnessEnhancer?>(null) }
+	
+	var playbackSpeed by remember { mutableFloatStateOf(SettingsManager.getPlaybackSpeed(context)) }
+	var playbackPitch by remember { mutableFloatStateOf(SettingsManager.getPlaybackPitch(context)) }
+	var bassBoostLevel by remember { mutableIntStateOf(SettingsManager.getBassBoost(context)) }
+	var replayGainEnabled by remember { mutableStateOf(SettingsManager.isReplayGainEnabled(context)) }
+	var showPlaybackEffectsDialog by remember { mutableStateOf(false) }
+	var bassBoostEffect by remember { mutableStateOf<android.media.audiofx.BassBoost?>(null) }
 	val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
 	DisposableEffect(lifecycleOwner) {
 		val observer = LifecycleEventObserver { _, event ->
@@ -1038,6 +1046,8 @@ fun AudioPlayerView(
 			} else if (key == "skip_silence") {
 				val skip = SettingsManager.isSkipSilenceEnabled(context)
 				players.forEach { it.skipSilenceEnabled = skip }
+			} else if (key == "replay_gain_enabled") {
+				replayGainEnabled = SettingsManager.isReplayGainEnabled(context)
 			}
 		}
 		SettingsManager.registerChangeListener(context, listener)
@@ -1046,26 +1056,90 @@ fun AudioPlayerView(
 		}
 	}
 
-	// Both players get their own enhancer, otherwise the boost drops out after a crossfade swap.
-	fun updateAmplifier() {
-		players.forEachIndexed { i, player ->
-			loudnessEnhancers[i]?.release()
-			loudnessEnhancers[i] = null
-			val sessionId = player.audioSessionId
-			if (amplifierEnabled && sessionId != C.AUDIO_SESSION_ID_UNSET && sessionId != 0) {
-				try {
-					loudnessEnhancers[i] = LoudnessEnhancer(sessionId).apply {
-						setTargetGain(amplifierLevel)
-						enabled = true
-					}
-				} catch (e: Exception) {
-					Log.e(TAG, "Could not attach amplifier to session $sessionId", e)
+	fun updateAmplifier(sessionId: Int) {
+		try {
+			loudnessEnhancer?.release()
+			if (amplifierEnabled && sessionId != androidx.media3.common.C.AUDIO_SESSION_ID_UNSET && sessionId != 0) {
+				loudnessEnhancer = android.media.audiofx.LoudnessEnhancer(sessionId).apply {
+					setTargetGain(amplifierLevel)
+					enabled = true
 				}
 			}
 		}
 	}
+	fun updateBassBoost(sessionId: Int) {
+		try {
+			bassBoostEffect?.release()
+			if (bassBoostLevel > 0 && sessionId != androidx.media3.common.C.AUDIO_SESSION_ID_UNSET && sessionId != 0) {
+				bassBoostEffect = android.media.audiofx.BassBoost(0, sessionId).apply {
+					enabled = true
+					setStrength(bassBoostLevel.toShort())
+				}
+			} else {
+				bassBoostEffect = null
+			}
+		} catch (e: Exception) {
+			e.printStackTrace()
+			bassBoostEffect = null
+		}
+	}
+	LaunchedEffect(players) {
+		players.forEach { player ->
+			val listener = object : androidx.media3.common.Player.Listener {
+				override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
+					if (!SettingsManager.isReplayGainEnabled(context)) {
+						player.volume = 1.0f
+						return
+					}
+					var gainDb = 0f
+					var found = false
+					for (group in tracks.groups) {
+						for (i in 0 until group.length) {
+							val metadata = group.getTrackFormat(i).metadata
+							if (metadata != null) {
+								for (j in 0 until metadata.length()) {
+									val entry = metadata.get(j)
+									val className = entry.javaClass.simpleName
+									if (className == "TextInformationFrame") {
+										try {
+											val id = entry.javaClass.getField("id").get(entry) as String
+											val description = entry.javaClass.getField("description").get(entry) as String
+											val value = entry.javaClass.getField("value").get(entry) as String
+											if (id.lowercase().contains("txxx") && description.lowercase().contains("replaygain_track_gain")) {
+												val parsed = value.replace("dB", "").trim().toFloatOrNull()
+												if (parsed != null) { gainDb = parsed; found = true }
+											}
+										} catch (e: Exception) {}
+									} else if (className == "VorbisComment") {
+										try {
+											val keyStr = entry.javaClass.getField("key").get(entry) as String
+											val value = entry.javaClass.getField("value").get(entry) as String
+											if (keyStr.equals("REPLAYGAIN_TRACK_GAIN", ignoreCase = true)) {
+												val parsed = value.replace("dB", "").trim().toFloatOrNull()
+												if (parsed != null) { gainDb = parsed; found = true }
+											}
+										} catch (e: Exception) {}
+									}
+								}
+							}
+						}
+					}
+					val volume = if (found) Math.pow(10.0, gainDb / 20.0).toFloat().coerceIn(0.1f, 3.0f) else 1.0f
+					player.volume = volume
+				}
+			}
+			player.addListener(listener)
+		}
+	}
 	LaunchedEffect(amplifierEnabled, amplifierLevel) {
 		updateAmplifier()
+	}
+	LaunchedEffect(bassBoostLevel) {
+		updateBassBoost(exoPlayer.audioSessionId)
+	}
+	LaunchedEffect(playbackSpeed, playbackPitch) {
+		val params = androidx.media3.common.PlaybackParameters(playbackSpeed, playbackPitch)
+		players.forEach { it.playbackParameters = params }
 	}
 	LaunchedEffect(showInfoDialog) {
 		if (showInfoDialog) {
@@ -1624,6 +1698,11 @@ fun AudioPlayerView(
 								},
 								leadingIcon = { Icon(if (amplifierEnabled) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff, null) }
 							)
+							DropdownMenuItem(
+								text = { Text("Playback Effects") },
+								onClick = { showPlaybackEffectsDialog = true; showMoreOptions = false },
+								leadingIcon = { Icon(Icons.Default.GraphicEq, null) }
+							)
 							if (canModifyPlaylist) {
 								DropdownMenuItem(
 									text = { Text(if (playlist.isHidden) "Unlock Playlist" else "Hide Playlist") },
@@ -1641,6 +1720,122 @@ fun AudioPlayerView(
 				}
 			}
 		}
+	}
+	if (showPlaybackEffectsDialog) {
+		AlertDialog(
+			modifier = Modifier.semantics { paneTitle = "Playback Effects" },
+			onDismissRequest = { showPlaybackEffectsDialog = false },
+			title = { Text("Playback Effects") },
+			text = {
+				Column {
+					// Playback Speed Slider
+					Column(
+						modifier = Modifier
+							.fillMaxWidth()
+							.padding(vertical = 8.dp)
+							.clearAndSetSemantics {
+								contentDescription = "Playback Speed"
+								setProgress { targetValue ->
+									val newSpeed = targetValue.coerceIn(0.5f, 2.0f)
+									playbackSpeed = newSpeed
+									SettingsManager.setPlaybackSpeed(context, newSpeed)
+									true
+								}
+								progressBarRangeInfo = ProgressBarRangeInfo(
+									current = playbackSpeed,
+									range = 0.5f..2.0f,
+									steps = 15
+								)
+								stateDescription = String.format("%.2fx speed", playbackSpeed)
+							}
+					) {
+						Text("Playback Speed: ${String.format("%.2fx", playbackSpeed)}", style = MaterialTheme.typography.bodyLarge)
+						Slider(
+							value = playbackSpeed,
+							onValueChange = { 
+								val newSpeed = (Math.round(it * 10f) / 10f).coerceIn(0.5f, 2.0f)
+								playbackSpeed = newSpeed
+								SettingsManager.setPlaybackSpeed(context, newSpeed)
+							},
+							valueRange = 0.5f..2.0f,
+							steps = 15,
+							modifier = Modifier.fillMaxWidth().clearAndSetSemantics {}
+						)
+					}
+					// Playback Pitch Slider
+					Column(
+						modifier = Modifier
+							.fillMaxWidth()
+							.padding(vertical = 8.dp)
+							.clearAndSetSemantics {
+								contentDescription = "Playback Pitch"
+								setProgress { targetValue ->
+									val newPitch = targetValue.coerceIn(0.5f, 2.0f)
+									playbackPitch = newPitch
+									SettingsManager.setPlaybackPitch(context, newPitch)
+									true
+								}
+								progressBarRangeInfo = ProgressBarRangeInfo(
+									current = playbackPitch,
+									range = 0.5f..2.0f,
+									steps = 15
+								)
+								stateDescription = String.format("%.2fx pitch", playbackPitch)
+							}
+					) {
+						Text("Playback Pitch: ${String.format("%.2fx", playbackPitch)}", style = MaterialTheme.typography.bodyLarge)
+						Slider(
+							value = playbackPitch,
+							onValueChange = { 
+								val newPitch = (Math.round(it * 10f) / 10f).coerceIn(0.5f, 2.0f)
+								playbackPitch = newPitch
+								SettingsManager.setPlaybackPitch(context, newPitch)
+							},
+							valueRange = 0.5f..2.0f,
+							steps = 15,
+							modifier = Modifier.fillMaxWidth().clearAndSetSemantics {}
+						)
+					}
+					// Bass Boost Slider
+					Column(
+						modifier = Modifier
+							.fillMaxWidth()
+							.padding(vertical = 8.dp)
+							.clearAndSetSemantics {
+								contentDescription = "Bass Boost"
+								setProgress { targetValue ->
+									val newBass = targetValue.toInt().coerceIn(0, 1000)
+									bassBoostLevel = newBass
+									SettingsManager.setBassBoost(context, newBass)
+									true
+								}
+								progressBarRangeInfo = ProgressBarRangeInfo(
+									current = bassBoostLevel.toFloat(),
+									range = 0f..1000f,
+									steps = 10
+								)
+								stateDescription = if (bassBoostLevel == 0) "Disabled" else "Level $bassBoostLevel"
+							}
+					) {
+						Text("Bass Boost: ${if (bassBoostLevel == 0) "Disabled" else bassBoostLevel}", style = MaterialTheme.typography.bodyLarge)
+						Slider(
+							value = bassBoostLevel.toFloat(),
+							onValueChange = { 
+								val newBass = (Math.round(it / 100f) * 100).coerceIn(0, 1000)
+								bassBoostLevel = newBass
+								SettingsManager.setBassBoost(context, newBass)
+							},
+							valueRange = 0f..1000f,
+							steps = 10,
+							modifier = Modifier.fillMaxWidth().clearAndSetSemantics {}
+						)
+					}
+				}
+			},
+			confirmButton = {
+				TextButton(onClick = { showPlaybackEffectsDialog = false }) { Text("Close") }
+			}
+		)
 	}
 	if (showSearchDialog) {
 		AlertDialog(

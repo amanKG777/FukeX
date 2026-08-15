@@ -50,6 +50,7 @@ fun SettingsScreen(
 	var isBackgroundPlaybackEnabled by remember { mutableStateOf(SettingsManager.isBackgroundPlaybackEnabled(context)) }
 	var isSkipSilenceEnabled by remember { mutableStateOf(SettingsManager.isSkipSilenceEnabled(context)) }
 	var isSkipUnavailableEnabled by remember { mutableStateOf(SettingsManager.isSkipUnavailableTracksEnabled(context)) }
+	var isReplayGainEnabled by remember { mutableStateOf(SettingsManager.isReplayGainEnabled(context)) }
 	var isExitPromptEnabled by remember { mutableStateOf(SettingsManager.isExitPromptEnabled(context)) }
 	var lockTimeout by remember { mutableStateOf(SettingsManager.getLockTimeout(context)) }
 	var showTimeoutDialog by remember { mutableStateOf(false) }
@@ -168,6 +169,16 @@ fun SettingsScreen(
 					onCheckedChange = { 
 						SettingsManager.setSkipUnavailableTracksEnabled(context, it)
 						isSkipUnavailableEnabled = it 
+					}
+				)
+				SettingsToggleItem(
+					title = "Enable ReplayGain",
+					subtitle = "Automatically normalize volume levels between tracks",
+					icon = Icons.Default.GraphicEq,
+					checked = isReplayGainEnabled,
+					onCheckedChange = { 
+						SettingsManager.setReplayGainEnabled(context, it)
+						isReplayGainEnabled = it 
 					}
 				)
 				Column(

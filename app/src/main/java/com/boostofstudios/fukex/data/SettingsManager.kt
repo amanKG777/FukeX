@@ -27,6 +27,10 @@ object SettingsManager {
     private const val KEY_FADE_OUT_AUTO = "fade_out_auto"
     private const val KEY_SKIP_SILENCE = "skip_silence"
     private const val KEY_SKIP_UNAVAILABLE = "skip_unavailable"
+    private const val KEY_PLAYBACK_SPEED = "playback_speed"
+    private const val KEY_PLAYBACK_PITCH = "playback_pitch"
+    private const val KEY_BASS_BOOST = "bass_boost"
+    private const val KEY_REPLAY_GAIN_ENABLED = "replay_gain_enabled"
 
     fun getPrefs(context: Context): SharedPreferences {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -136,4 +140,24 @@ object SettingsManager {
     fun getFadeOutAuto(context: Context): Int = getPrefs(context).getInt(KEY_FADE_OUT_AUTO, 0)
 
     fun setFadeOutAuto(context: Context, ms: Int) = getPrefs(context).edit().putInt(KEY_FADE_OUT_AUTO, ms).apply()
+
+    fun getPlaybackSpeed(context: Context): Float = getPrefs(context).getFloat(KEY_PLAYBACK_SPEED, 1.0f)
+
+    fun setPlaybackSpeed(context: Context, speed: Float) = getPrefs(context).edit().putFloat(KEY_PLAYBACK_SPEED, speed).apply()
+
+    fun getPlaybackPitch(context: Context): Float = getPrefs(context).getFloat(KEY_PLAYBACK_PITCH, 1.0f)
+
+    fun setPlaybackPitch(context: Context, pitch: Float) = getPrefs(context).edit().putFloat(KEY_PLAYBACK_PITCH, pitch).apply()
+
+    fun getBassBoost(context: Context): Int = getPrefs(context).getInt(KEY_BASS_BOOST, 0)
+
+    fun setBassBoost(context: Context, level: Int) = getPrefs(context).edit().putInt(KEY_BASS_BOOST, level).apply()
+
+    fun isReplayGainEnabled(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_REPLAY_GAIN_ENABLED, false)
+    }
+
+    fun setReplayGainEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_REPLAY_GAIN_ENABLED, enabled).apply()
+    }
 }
