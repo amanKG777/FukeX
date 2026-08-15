@@ -982,6 +982,12 @@ fun createFukexPlayer(context: android.content.Context): androidx.media3.exoplay
 		}
 }
 
+private data class MoreOptionAction(
+	val label: String,
+	val icon: androidx.compose.ui.graphics.vector.ImageVector,
+	val onClick: () -> Unit
+)
+
 @Composable
 fun AudioPlayerView(
 	playlist: Playlist,
@@ -1642,79 +1648,49 @@ fun AudioPlayerView(
 						Icon(Icons.Default.SkipNext, contentDescription = "Next")
 					}
 					Box {
+						val moreOptionsActions = buildList {
+							add(MoreOptionAction("Search within playlist", Icons.Default.Search) { showSearchDialog = true })
+							add(MoreOptionAction("Playlist info", Icons.Default.Info) { showInfoDialog = true })
+							add(
+								MoreOptionAction(
+									if (amplifierEnabled) "Disable Amplifier" else "Enable Amplifier (Boost ${amplifierLevel / 100}dB)",
+									if (amplifierEnabled) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff
+								) {
+									amplifierEnabled = !amplifierEnabled
+									SettingsManager.setAmplifierEnabled(context, amplifierEnabled)
+								}
+							)
+							add(MoreOptionAction("Playback Effects", Icons.Default.GraphicEq) { showPlaybackEffectsDialog = true })
+							if (canModifyPlaylist) {
+								add(
+									MoreOptionAction(
+										if (playlist.isHidden) "Unlock Playlist" else "Hide Playlist",
+										if (playlist.isHidden) Icons.Default.LockOpen else Icons.Default.Lock
+									) { onHide() }
+								)
+								add(MoreOptionAction("Remove Playlist", Icons.Default.Delete) { onRemove() })
+							}
+						}
 						IconButton(
 							onClick = { showMoreOptions = true },
 							modifier = Modifier.semantics {
 								contentDescription = "More Options"
-								val actions = mutableListOf(
-									CustomAccessibilityAction("Search within playlist") {
-										showSearchDialog = true
-										true
-									},
-									CustomAccessibilityAction("Playlist info") {
-										showInfoDialog = true
-										true
-									},
-									CustomAccessibilityAction(if (amplifierEnabled) "Disable Amplifier" else "Enable Amplifier (Boost ${amplifierLevel / 100}dB)") {
-										amplifierEnabled = !amplifierEnabled
-										SettingsManager.setAmplifierEnabled(context, amplifierEnabled)
+								customActions = moreOptionsActions.map { action ->
+									CustomAccessibilityAction(action.label) {
+										action.onClick()
 										true
 									}
-								)
-								if (canModifyPlaylist) {
-									actions.add(
-										CustomAccessibilityAction(if (playlist.isHidden) "Unlock" else "Hide") {
-											onHide()
-											true
-										}
-									)
-									actions.add(
-										CustomAccessibilityAction("Remove") {
-											onRemove()
-											true
-										}
-									)
 								}
-								customActions = actions
 							}
 						) {
 							Icon(Icons.Default.MoreVert, contentDescription = null)
 						}
 						DropdownMenu(expanded = showMoreOptions, onDismissRequest = { showMoreOptions = false }) {
-							DropdownMenuItem(
-								text = { Text("Search within playlist") },
-								onClick = { showSearchDialog = true; showMoreOptions = false },
-								leadingIcon = { Icon(Icons.Default.Search, null) }
-							)
-							DropdownMenuItem(
-								text = { Text("Playlist info") },
-								onClick = { showInfoDialog = true; showMoreOptions = false },
-								leadingIcon = { Icon(Icons.Default.Info, null) }
-							)
-							DropdownMenuItem(
-								text = { Text(if (amplifierEnabled) "Disable Amplifier" else "Enable Amplifier (Boost ${amplifierLevel / 100}dB)") },
-								onClick = { 
-									amplifierEnabled = !amplifierEnabled
-									SettingsManager.setAmplifierEnabled(context, amplifierEnabled)
-									showMoreOptions = false 
-								},
-								leadingIcon = { Icon(if (amplifierEnabled) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff, null) }
-							)
-							DropdownMenuItem(
-								text = { Text("Playback Effects") },
-								onClick = { showPlaybackEffectsDialog = true; showMoreOptions = false },
-								leadingIcon = { Icon(Icons.Default.GraphicEq, null) }
-							)
-							if (canModifyPlaylist) {
+							moreOptionsActions.forEach { action ->
 								DropdownMenuItem(
-									text = { Text(if (playlist.isHidden) "Unlock Playlist" else "Hide Playlist") },
-									onClick = { onHide(); showMoreOptions = false },
-									leadingIcon = { Icon(if (playlist.isHidden) Icons.Default.LockOpen else Icons.Default.Lock, null) }
-								)
-								DropdownMenuItem(
-									text = { Text("Remove Playlist") },
-									onClick = { onRemove(); showMoreOptions = false },
-									leadingIcon = { Icon(Icons.Default.Delete, null) }
+									text = { Text(action.label) },
+									onClick = { action.onClick(); showMoreOptions = false },
+									leadingIcon = { Icon(action.icon, null) }
 								)
 							}
 						}
