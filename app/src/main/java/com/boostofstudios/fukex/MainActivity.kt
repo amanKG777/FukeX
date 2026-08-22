@@ -127,6 +127,7 @@ private fun MainScreenContent(initialPlaylists: List<Playlist>, modifier: Modifi
 	var showFilePicker by remember { mutableStateOf(false) }
 	var showSmbPicker by remember { mutableStateOf(false) }
 	var showAddMediaDialog by remember { mutableStateOf(false) }
+	var showYoutubeSearch by remember { mutableStateOf(false) }
 	var showSettings by remember { mutableStateOf(false) }
 	var showExitDialog by remember { mutableStateOf(false) }
 	var showStorageRationale by remember { mutableStateOf(false) }
@@ -153,6 +154,51 @@ private fun MainScreenContent(initialPlaylists: List<Playlist>, modifier: Modifi
 			dismissButton = {
 				TextButton(onClick = { showExitDialog = false }) {
 					Text("No")
+				}
+			}
+		)
+	}
+	var showUpdateDialog by remember { mutableStateOf(false) }
+	var updateUrl by remember { mutableStateOf("https://github.com/amankg777/fukex/releases/latest") }
+	LaunchedEffect(Unit) {
+		kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+			try {
+				val url = java.net.URL("https://api.github.com/repos/amankg777/fukex/releases/latest")
+				val connection = url.openConnection() as java.net.HttpURLConnection
+				connection.requestMethod = "GET"
+				connection.setRequestProperty("Accept", "application/vnd.github.v3+json")
+				connection.connectTimeout = 5000
+				if (connection.responseCode == 200) {
+					val jsonResponse = connection.inputStream.bufferedReader().use { it.readText() }
+					val jsonObject = org.json.JSONObject(jsonResponse)
+					val tagName = jsonObject.optString("tag_name", "").removePrefix("v")
+					val htmlUrl = jsonObject.optString("html_url", "https://github.com/amankg777/fukex/releases/latest")
+					if (tagName.isNotEmpty() && tagName != BuildConfig.VERSION_NAME) {
+						updateUrl = htmlUrl
+						showUpdateDialog = true
+					}
+				}
+			} catch (e: Exception) {
+				// Ignore
+			}
+		}
+	}
+	if (showUpdateDialog) {
+		AlertDialog(
+			onDismissRequest = { showUpdateDialog = false },
+			title = { Text("New Version Available") },
+			text = { Text("A new version of FukeX is available. Would you like to update?") },
+			confirmButton = {
+				Button(onClick = { 
+					showUpdateDialog = false
+					context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(updateUrl)))
+				}) {
+					Text("Update")
+				}
+			},
+			dismissButton = {
+				TextButton(onClick = { showUpdateDialog = false }) {
+					Text("Later")
 				}
 			}
 		)
@@ -828,20 +874,45 @@ Box(modifier = Modifier.weight(1f)) {
 				title = { Text("Add Media") },
 				text = {
 					Column {
-						Text("Where would you like to add media from?")
+						Text("Where would you like to add media from?", modifier = Modifier.padding(bottom = 16.dp))
+						Button(onClick = {
+							showAddMediaDialog = false
+							showFilePicker = true
+						}, modifier = Modifier.fillMaxWidth()) { Text("Local Device") }
+						Button(onClick = {
+							showAddMediaDialog = false
+							showSmbPicker = true
+						}, modifier = Modifier.fillMaxWidth()) { Text("SMB Share") }
+						Button(onClick = {
+							showAddMediaDialog = false
+							showYoutubeSearch = true
+						}, modifier = Modifier.fillMaxWidth()) { Text("YouTube Search") }
 					}
 				},
-				confirmButton = {
-					TextButton(onClick = {
-						showAddMediaDialog = false
-						showFilePicker = true
-					}) { Text("Local Device") }
-				},
+				confirmButton = {},
 				dismissButton = {
-					TextButton(onClick = {
-						showAddMediaDialog = false
-						showSmbPicker = true
-					}) { Text("SMB Share") }
+					TextButton(onClick = { showAddMediaDialog = false }) { Text("Cancel") }
+				}
+			)
+		}
+		if (showYoutubeSearch) {
+			com.boostofstudios.fukex.ui.YoutubeSearchScreen(
+				onBack = { showYoutubeSearch = false },
+				onVideoSelected = { uri ->
+					showYoutubeSearch = false
+					if (visiblePlaylists.isNotEmpty()) {
+						val safeIndex = kotlin.math.min(selectedTabIndex, visiblePlaylists.lastIndex)
+						if (safeIndex >= 0) {
+							val currentPlaylist = visiblePlaylists[safeIndex]
+							val updatedPlaylist = currentPlaylist.copy(uris = currentPlaylist.uris + listOf(android.net.Uri.parse(uri)))
+							val newList = playlists.map { if (it.id == currentPlaylist.id) updatedPlaylist else it }
+							playlists = newList
+							scope.launch(Dispatchers.IO) {
+								PlaylistManager.savePlaylists(context, newList)
+							}
+							lastActiveTimes = lastActiveTimes + (currentPlaylist.id to System.currentTimeMillis())
+						}
+					}
 				}
 			)
 		}
@@ -968,8 +1039,36 @@ fun createFukexPlayer(context: android.content.Context): androidx.media3.exoplay
 			}
 		}
 	}
+	val resolvingDataSourceFactory = androidx.media3.datasource.ResolvingDataSource.Factory(routingDataSourceFactory, object : androidx.media3.datasource.ResolvingDataSource.Resolver {
+		override fun resolveDataSpec(dataSpec: androidx.media3.datasource.DataSpec): androidx.media3.datasource.DataSpec {
+			val uri = dataSpec.uri
+			if (uri.scheme == "youtube") {
+				try {
+					val videoId = uri.host ?: uri.path?.removePrefix("/") ?: uri.toString().substringAfter("youtube://")
+					val url = "https://www.youtube.com/watch?v=$videoId"
+					val extractor = org.schabi.newpipe.extractor.ServiceList.YouTube.getStreamExtractor(url)
+					extractor.fetchPage()
+					val audioStreamUrl = extractor.audioStreams.maxByOrNull { it.bitrate }?.content
+						?: extractor.videoStreams.maxByOrNull { it.resolution?.substringBefore("p")?.toIntOrNull() ?: 0 }?.content
+						?: extractor.hlsUrl
+						?: extractor.dashMpdUrl
+					
+					if (audioStreamUrl != null) {
+						return dataSpec.buildUpon().setUri(android.net.Uri.parse(audioStreamUrl)).build()
+					} else {
+						throw java.io.IOException("No playable streams found for video.")
+					}
+				} catch (e: Exception) {
+					e.printStackTrace()
+					java.io.File(context.filesDir, "newpipe_error.log").writeText(android.util.Log.getStackTraceString(e))
+					throw java.io.IOException("Failed to extract youtube video: ${e.message}", e)
+				}
+			}
+			return dataSpec
+		}
+	})
 	val mediaSourceFactory = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(context)
-		.setDataSourceFactory(routingDataSourceFactory)
+		.setDataSourceFactory(resolvingDataSourceFactory)
 	return androidx.media3.exoplayer.ExoPlayer.Builder(context)
 		.setMediaSourceFactory(mediaSourceFactory)
 		.setAudioAttributes(audioAttributes, false)
@@ -1581,7 +1680,7 @@ fun AudioPlayerView(
 		Surface(shadowElevation = 8.dp) {
 			Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
 				Text(
-					text = "Now Playing: ${playlist.name} - Track ${currentIndex + 1} of ${playlist.uris.size}",
+					text = if (playlist.uris.isEmpty()) "Now Playing: ${playlist.name} - No tracks here" else "Now Playing: ${playlist.name} - Track ${currentIndex + 1} of ${playlist.uris.size}",
 					style = MaterialTheme.typography.labelMedium,
 					modifier = Modifier.padding(bottom = 8.dp)
 				)

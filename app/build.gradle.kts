@@ -15,6 +15,14 @@ val keystoreProperties = Properties().apply {
     }
 }
 
+val localPropertiesFile = rootProject.file("local.properties")
+val localProperties = Properties().apply {
+    if (localPropertiesFile.exists()) {
+        localPropertiesFile.inputStream().use { load(it) }
+    }
+}
+val youtubeApiKey = localProperties.getProperty("YOUTUBE_API_KEY") ?: ""
+
 android {
     namespace = "com.boostofstudios.fukex"
     compileSdk {
@@ -27,6 +35,7 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
+        buildConfigField("String", "YOUTUBE_API_KEY", "\"$youtubeApiKey\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
@@ -95,4 +104,6 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+    implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 }

@@ -394,6 +394,89 @@ fun AboutScreen(onBack: () -> Unit) {
 				"This project is licensed under the MIT License.",
 				style = MaterialTheme.typography.bodyMedium
 			)
+			var showDoc by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+			var showLicense by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+			
+			androidx.compose.material3.Button(onClick = { showDoc = true }, modifier = Modifier.fillMaxWidth()) {
+				androidx.compose.material3.Text("View Documentation")
+			}
+			androidx.compose.material3.Button(onClick = { showLicense = true }, modifier = Modifier.fillMaxWidth()) {
+				androidx.compose.material3.Text("View License")
+			}
+			
+			if (showDoc) {
+				DocumentationScreen(onBack = { showDoc = false })
+			}
+			if (showLicense) {
+				LicenseScreen(onBack = { showLicense = false })
+			}
+		}
+	}
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DocumentationScreen(onBack: () -> Unit) {
+	androidx.activity.compose.BackHandler(onBack = onBack)
+	Scaffold(
+		topBar = {
+			TopAppBar(
+				title = { Text("Documentation") },
+				navigationIcon = {
+					IconButton(onClick = onBack) {
+						Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+					}
+				}
+			)
+		}
+	) { padding ->
+		androidx.compose.ui.viewinterop.AndroidView(
+			modifier = Modifier
+				.fillMaxSize()
+				.padding(padding),
+			factory = { context ->
+				android.webkit.WebView(context).apply {
+					settings.javaScriptEnabled = true
+					loadUrl("file:///android_asset/documentation.html")
+				}
+			}
+		)
+	}
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LicenseScreen(onBack: () -> Unit) {
+	androidx.activity.compose.BackHandler(onBack = onBack)
+	Scaffold(
+		topBar = {
+			TopAppBar(
+				title = { Text("License") },
+				navigationIcon = {
+					IconButton(onClick = onBack) {
+						Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+					}
+				}
+			)
+		}
+	) { padding ->
+		val context = LocalContext.current
+		val licenseText = androidx.compose.runtime.remember {
+			try {
+				context.assets.open("LICENSE.txt").bufferedReader().use { it.readText() }
+			} catch (e: Exception) {
+				"License file not found."
+			}
+		}
+		androidx.compose.foundation.lazy.LazyColumn(
+			modifier = Modifier
+				.fillMaxSize()
+				.padding(padding)
+				.padding(16.dp)
+		) {
+			item {
+				Text(text = licenseText, style = MaterialTheme.typography.bodySmall)
+			}
 		}
 	}
 }
