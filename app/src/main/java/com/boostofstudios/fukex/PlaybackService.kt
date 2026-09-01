@@ -10,6 +10,10 @@ import android.os.Build
 import android.os.IBinder
 import android.support.v4.media.session.MediaSessionCompat
 import androidx.core.app.NotificationCompat
+import android.media.AudioManager
+import android.content.SharedPreferences
+import androidx.media.VolumeProviderCompat
+import com.boostofstudios.fukex.data.SettingsManager
 
 class PlaybackService : Service() {
     companion object {
@@ -20,15 +24,55 @@ class PlaybackService : Service() {
         const val ACTION_NEXT = "com.boostofstudios.fukex.ACTION_NEXT"
         const val ACTION_PREV = "com.boostofstudios.fukex.ACTION_PREV"
         const val ACTION_STOP = "com.boostofstudios.fukex.ACTION_STOP"
+        const val ACTION_VOICE_ASSISTANT = "com.boostofstudios.fukex.ACTION_VOICE_ASSISTANT"
         const val EXTRA_IS_PLAYING = "EXTRA_IS_PLAYING"
         const val EXTRA_TITLE = "EXTRA_TITLE"
         const val EXTRA_AUTHOR = "EXTRA_AUTHOR"
         var activeMediaSession: MediaSessionCompat? = null
     }
 
+    private var sensorManager: android.hardware.SensorManager? = null
+    private var shakeDetector: ShakeDetector? = null
+    
+    private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == "voice_assistant_background") {
+            updateShakeDetector()
+        }
+    }
+
+    private fun updateShakeDetector() {
+        if (SettingsManager.isVoiceAssistantBackgroundEnabled(this)) {
+            if (sensorManager == null) {
+                sensorManager = getSystemService(Context.SENSOR_SERVICE) as android.hardware.SensorManager
+                shakeDetector = ShakeDetector {
+                    // Vibrate
+                    val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        vibrator.vibrate(android.os.VibrationEffect.createOneShot(200, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
+                    } else {
+                        @Suppress("DEPRECATION")
+                        vibrator.vibrate(200)
+                    }
+                    
+                    // Beep
+                    android.media.ToneGenerator(AudioManager.STREAM_MUSIC, 100).startTone(android.media.ToneGenerator.TONE_PROP_BEEP)
+                    
+                    sendBroadcast(Intent(ACTION_VOICE_ASSISTANT).apply { setPackage(packageName) })
+                }
+            }
+            val accelerometer = sensorManager?.getDefaultSensor(android.hardware.Sensor.TYPE_ACCELEROMETER)
+            accelerometer?.let {
+                sensorManager?.registerListener(shakeDetector, it, android.hardware.SensorManager.SENSOR_DELAY_GAME)
+            }
+        } else {
+            shakeDetector?.let { sensorManager?.unregisterListener(it) }
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+        SettingsManager.registerChangeListener(this, prefsListener)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -38,6 +82,7 @@ class PlaybackService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
+        updateShakeDetector()
         if (intent.action == Intent.ACTION_MEDIA_BUTTON) {
             activeMediaSession?.takeIf { it.isActive }?.let { session ->
                 androidx.media.session.MediaButtonReceiver.handleIntent(session, intent)
@@ -148,6 +193,7 @@ class PlaybackService : Service() {
     }
 
     override fun onDestroy() {
+        SettingsManager.unregisterChangeListener(this, prefsListener)
         activeMediaSession = null
         super.onDestroy()
     }

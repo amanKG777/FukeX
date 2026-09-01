@@ -8,6 +8,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.SettingsVoice
 import androidx.compose.material.icons.filled.LockClock
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.GraphicEq
@@ -228,6 +230,34 @@ fun SettingsScreen(
 						valueRange = 0f..5f,
 						steps = 4,
 						modifier = Modifier.fillMaxWidth().clearAndSetSemantics {}
+					)
+				}
+			}
+			item {
+				SettingsHeader("AI Voice Assistant")
+				var isVoiceAssistantEnabled by remember { mutableStateOf(SettingsManager.isVoiceAssistantEnabled(context)) }
+				var isVoiceAssistantBackgroundEnabled by remember { mutableStateOf(SettingsManager.isVoiceAssistantBackgroundEnabled(context)) }
+				
+				SettingsToggleItem(
+					title = "Enable Voice Assistant",
+					subtitle = "Triple-press Volume Down to trigger AI helper",
+					icon = Icons.Default.Mic,
+					checked = isVoiceAssistantEnabled,
+					onCheckedChange = { 
+						SettingsManager.setVoiceAssistantEnabled(context, it)
+						isVoiceAssistantEnabled = it 
+					}
+				)
+				if (isVoiceAssistantEnabled) {
+					SettingsToggleItem(
+						title = "Work in Background",
+						subtitle = "Trigger assistant even when app is minimized (during playback)",
+						icon = Icons.Default.SettingsVoice,
+						checked = isVoiceAssistantBackgroundEnabled,
+						onCheckedChange = { 
+							SettingsManager.setVoiceAssistantBackgroundEnabled(context, it)
+							isVoiceAssistantBackgroundEnabled = it 
+						}
 					)
 				}
 			}
@@ -555,3 +585,5 @@ fun FadeSliderItem(title: String, msValue: Int, onValueChange: (Int) -> Unit) {
 		)
 	}
 }
+
+

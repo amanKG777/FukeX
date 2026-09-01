@@ -74,9 +74,179 @@ import androidx.lifecycle.LifecycleEventObserver
 private const val TAG = "FukeX"
 
 class MainActivity : FragmentActivity() {
+	private var voiceAssistantManager: VoiceAssistantManager? = null
+	private var sensorManager: android.hardware.SensorManager? = null
+	private var shakeDetector: ShakeDetector? = null
+
+	private val prefsListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+		if (key == "voice_assistant_enabled") {
+			updateForegroundShakeDetector()
+		}
+	}
+
+	private val voiceAssistantReceiver = object : android.content.BroadcastReceiver() {
+		override fun onReceive(context: android.content.Context, intent: android.content.Intent) {
+			if (intent.action == PlaybackService.ACTION_VOICE_ASSISTANT) {
+				voiceAssistantManager?.startListening()
+			}
+		}
+	}
+
+	private fun updateForegroundShakeDetector() {
+		if (SettingsManager.isVoiceAssistantEnabled(this)) {
+			if (sensorManager == null) {
+				sensorManager = getSystemService(android.content.Context.SENSOR_SERVICE) as? android.hardware.SensorManager
+				shakeDetector = ShakeDetector {
+					try {
+						val vibrator = getSystemService(android.content.Context.VIBRATOR_SERVICE) as android.os.Vibrator
+						if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+							vibrator.vibrate(android.os.VibrationEffect.createOneShot(200, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
+						} else {
+							@Suppress("DEPRECATION")
+							vibrator.vibrate(200)
+						}
+					} catch (e: Exception) {}
+
+					try {
+						android.media.ToneGenerator(android.media.AudioManager.STREAM_MUSIC, 100).startTone(android.media.ToneGenerator.TONE_PROP_BEEP)
+					} catch (e: Exception) {}
+
+					voiceAssistantManager?.startListening()
+				}
+			}
+			val accelerometer = sensorManager?.getDefaultSensor(android.hardware.Sensor.TYPE_ACCELEROMETER)
+			accelerometer?.let {
+				sensorManager?.registerListener(shakeDetector, it, android.hardware.SensorManager.SENSOR_DELAY_GAME)
+			}
+		} else {
+			shakeDetector?.let { sensorManager?.unregisterListener(it) }
+		}
+	}
+
+	override fun onResume() {
+		super.onResume()
+		updateForegroundShakeDetector()
+	}
+
+	override fun onPause() {
+		super.onPause()
+		shakeDetector?.let { sensorManager?.unregisterListener(it) }
+	}
+
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
 		enableEdgeToEdge()
+		
+		if (androidx.core.content.ContextCompat.checkSelfPermission(this, android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+			androidx.core.app.ActivityCompat.requestPermissions(this, arrayOf(android.Manifest.permission.RECORD_AUDIO), 1)
+		}
+
+		SettingsManager.registerChangeListener(this, prefsListener)
+		updateForegroundShakeDetector()
+
+		voiceAssistantManager = VoiceAssistantManager(this) { command, query ->
+			when (command) {
+				"play" -> {
+					if (query.isNullOrEmpty()) {
+						PlaybackService.activeMediaSession?.controller?.transportControls?.play()
+						return@VoiceAssistantManager
+					}
+					val cleanQuery = query.lowercase(java.util.Locale.getDefault())
+						.replace(Regex("[^a-zA-Z0-9\\s]"), " ")
+						.trim()
+					val queryWords = cleanQuery.split("\\s+".toRegex()).filter { it.length > 1 }
+					var foundTrack: android.net.Uri? = null
+					var isEncrypted = false
+
+					val playlists = com.boostofstudios.fukex.data.PlaylistManager.loadPlaylists(this)
+					for (p in playlists) {
+						for (i in p.uris.indices) {
+							val uri = p.uris[i]
+							val title = trackTitle(uri, i, this).lowercase(java.util.Locale.getDefault())
+							val cleanTitle = title.replace(Regex("[^a-zA-Z0-9\\s]"), " ")
+							val uriStr = uri.toString().lowercase(java.util.Locale.getDefault())
+
+							if (cleanTitle.contains(cleanQuery) || uriStr.contains(cleanQuery) ||
+								(queryWords.isNotEmpty() && queryWords.all { cleanTitle.contains(it) || uriStr.contains(it) })) {
+								foundTrack = uri
+								if (p.pinHash != null) {
+									isEncrypted = true
+								}
+								break
+							}
+						}
+						if (foundTrack != null) break
+					}
+
+					if (foundTrack != null) {
+						if (isEncrypted) {
+							voiceAssistantManager?.speak("I found the song, but the playlist is encrypted. Can you unlock it so I can play?")
+						} else {
+							voiceAssistantManager?.speak("Playing from playlist.")
+							PlaybackService.activeMediaSession?.controller?.transportControls?.playFromUri(foundTrack, null)
+						}
+					} else {
+						voiceAssistantManager?.speak("Searching YouTube for $query")
+						Thread {
+							try {
+								val searchExtractor = org.schabi.newpipe.extractor.ServiceList.YouTube.getSearchExtractor(query)
+								searchExtractor.fetchPage()
+								val firstVideo = searchExtractor.initialPage.items.firstOrNull { it is org.schabi.newpipe.extractor.stream.StreamInfoItem } as? org.schabi.newpipe.extractor.stream.StreamInfoItem
+								if (firstVideo != null) {
+									val videoId = firstVideo.url.substringAfterLast("v=").substringBefore("&")
+									val videoTitle = firstVideo.name
+									val ytUri = android.net.Uri.parse("youtube://$videoId?title=${android.net.Uri.encode(videoTitle)}")
+									runOnUiThread {
+										voiceAssistantManager?.speak("Playing from YouTube.")
+										PlaybackService.activeMediaSession?.controller?.transportControls?.playFromUri(ytUri, null)
+									}
+								} else {
+									runOnUiThread {
+										voiceAssistantManager?.speak("Couldn't find $query on YouTube.")
+									}
+								}
+							} catch (e: Exception) {
+								runOnUiThread {
+									voiceAssistantManager?.speak("Error searching YouTube.")
+								}
+							}
+						}.start()
+					}
+				}
+				"next" -> PlaybackService.activeMediaSession?.controller?.transportControls?.skipToNext()
+				"previous" -> PlaybackService.activeMediaSession?.controller?.transportControls?.skipToPrevious()
+				"pause" -> PlaybackService.activeMediaSession?.controller?.transportControls?.pause()
+				"resume" -> PlaybackService.activeMediaSession?.controller?.transportControls?.play()
+				"amplifier_on" -> SettingsManager.setAmplifierEnabled(this, true)
+				"amplifier_off" -> SettingsManager.setAmplifierEnabled(this, false)
+				"amplifier_increase" -> {
+					val current = SettingsManager.getAmplifierLevel(this)
+					SettingsManager.setAmplifierLevel(this, java.lang.Math.min(1500, current + 500))
+					voiceAssistantManager?.speak("Amplifier increased")
+				}
+				"amplifier_decrease" -> {
+					val current = SettingsManager.getAmplifierLevel(this)
+					SettingsManager.setAmplifierLevel(this, java.lang.Math.max(0, current - 500))
+					voiceAssistantManager?.speak("Amplifier decreased")
+				}
+				"open_docs" -> {
+					voiceAssistantManager?.speak("Opening documentation")
+					val intent = android.content.Intent(this, MainActivity::class.java).apply {
+						action = "ACTION_OPEN_DOCS"
+						flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP
+					}
+					startActivity(intent)
+				}
+			}
+		}
+		
+		if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+			registerReceiver(voiceAssistantReceiver, android.content.IntentFilter(PlaybackService.ACTION_VOICE_ASSISTANT), RECEIVER_NOT_EXPORTED)
+		} else {
+			@Suppress("UnspecifiedRegisterReceiverFlag")
+			registerReceiver(voiceAssistantReceiver, android.content.IntentFilter(PlaybackService.ACTION_VOICE_ASSISTANT))
+		}
+
 		setContent {
 			FukeXTheme {
 				Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
@@ -84,6 +254,13 @@ class MainActivity : FragmentActivity() {
 				}
 			}
 		}
+	}
+
+	override fun onDestroy() {
+		super.onDestroy()
+		SettingsManager.unregisterChangeListener(this, prefsListener)
+		unregisterReceiver(voiceAssistantReceiver)
+		voiceAssistantManager?.destroy()
 	}
 }
 
@@ -1044,7 +1221,7 @@ fun createFukexPlayer(context: android.content.Context): androidx.media3.exoplay
 			val uri = dataSpec.uri
 			if (uri.scheme == "youtube") {
 				try {
-					val videoId = uri.host ?: uri.path?.removePrefix("/") ?: uri.toString().substringAfter("youtube://")
+					val videoId = (uri.host?.takeIf { it.isNotBlank() } ?: uri.path?.removePrefix("/") ?: uri.toString().substringAfter("youtube://")).substringBefore("?")
 					val url = "https://www.youtube.com/watch?v=$videoId"
 					val extractor = org.schabi.newpipe.extractor.ServiceList.YouTube.getStreamExtractor(url)
 					extractor.fetchPage()
@@ -1425,6 +1602,8 @@ fun AudioPlayerView(
 	val currentPlayIndex = rememberUpdatedState({ index: Int, play: Boolean -> playIndex(index, play) })
 	val currentCurrentIndex = rememberUpdatedState(currentIndex)
 	val currentPlaylistUrisSize = rememberUpdatedState(playlist.uris.size)
+	val currentPlaylist = rememberUpdatedState(playlist)
+	val currentOnUpdatePlaylist = rememberUpdatedState(onUpdatePlaylist)
 	val mediaSession = remember {
 		MediaSessionCompat(context, "FukeXSession").apply {
 			val mediaButtonIntent = Intent(Intent.ACTION_MEDIA_BUTTON).apply {
@@ -1458,6 +1637,36 @@ fun AudioPlayerView(
 					currentPlayIndex.value.invoke(idx - 1, true)
 				}
 			}
+
+			override fun onPlayFromUri(uri: Uri?, extras: Bundle?) {
+				if (uri == null) return
+				val currentList = currentPlaylist.value
+				val targetIndex = currentList.uris.indexOf(uri)
+				if (targetIndex != -1) {
+					currentIndex = targetIndex
+					currentPlayIndex.value.invoke(targetIndex, true)
+				} else {
+					val newUris = currentList.uris + uri
+					val newPlaylist = currentList.copy(uris = newUris)
+					currentOnUpdatePlaylist.value(newPlaylist)
+					val mediaItem = androidx.media3.common.MediaItem.fromUri(uri)
+					players.forEach { player ->
+						player.addMediaItem(mediaItem)
+					}
+					val newIdx = newUris.lastIndex
+					currentIndex = newIdx
+					val p = exoPlayer
+					p.seekTo(newIdx, 0L)
+					if (p.playbackState == androidx.media3.common.Player.STATE_IDLE) {
+						p.prepare()
+					}
+					if (audioFocus.requestFocus()) {
+						p.playWhenReady = true
+						setVolume(p, 1f)
+						p.play()
+					}
+				}
+			}
 		})
 		onDispose {
 			mediaSession.release()
@@ -1480,7 +1689,7 @@ fun AudioPlayerView(
 			).setState(state, PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, 1.0f)
 			.build()
 		mediaSession.setPlaybackState(playbackState)
-		val trackName = if (currentIndex in playlist.uris.indices) trackTitle(playlist.uris[currentIndex], currentIndex) else "Unknown"
+		val trackName = if (currentIndex in playlist.uris.indices) trackTitle(playlist.uris[currentIndex], currentIndex, context) else "Unknown"
 		val metadata = MediaMetadataCompat.Builder()
 			.putString(MediaMetadataCompat.METADATA_KEY_TITLE, trackName)
 			.putString(MediaMetadataCompat.METADATA_KEY_ARTIST, playlist.name)
@@ -1617,7 +1826,7 @@ fun AudioPlayerView(
 				ListItem(
 					headlineContent = {
 						Text(
-							trackTitle(uri, index),
+							trackTitle(uri, index, context),
 							color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
 						)
 					},
@@ -1929,11 +2138,11 @@ fun AudioPlayerView(
 					)
 					Spacer(Modifier.height(8.dp))
 					val filteredTracks = playlist.uris.mapIndexed { index, uri -> index to uri }
-						.filter { trackTitle(it.second, it.first).contains(searchQuery, ignoreCase = true) }
+						.filter { trackTitle(it.second, it.first, context).contains(searchQuery, ignoreCase = true) }
 					LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
 						items(filteredTracks) { (index, uri) ->
 							ListItem(
-								headlineContent = { Text(trackTitle(uri, index)) },
+								headlineContent = { Text(trackTitle(uri, index, context)) },
 								modifier = Modifier.clickable {
 									playIndex(index)
 									showSearchDialog = false
@@ -1984,9 +2193,34 @@ fun formatTime(ms: Long): String {
 	}
 }
 
-fun trackTitle(uri: Uri, index: Int): String {
-	val name = uri.lastPathSegment?.let { Uri.decode(it) }?.takeIf { it.isNotBlank() }
-	return name?.substringBeforeLast('.')?.takeIf { it.isNotBlank() } ?: "Track ${index + 1}"
+fun trackTitle(uri: Uri, index: Int, context: android.content.Context? = null): String {
+	if (uri.scheme == "youtube") {
+		val titleParam = uri.getQueryParameter("title")
+		if (!titleParam.isNullOrBlank()) {
+			return Uri.decode(titleParam)
+		}
+	}
+	if (context != null && uri.scheme == "content") {
+		try {
+			context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+				if (cursor.moveToFirst()) {
+					val name = cursor.getString(0)?.takeIf { it.isNotBlank() }
+					if (name != null) {
+						return name.substringBeforeLast('.')
+					}
+				}
+			}
+		} catch (e: Exception) {}
+	}
+	val lastSegment = uri.lastPathSegment?.let { Uri.decode(it) }?.takeIf { it.isNotBlank() }
+	val fromSegment = lastSegment?.substringAfterLast('/')?.substringBeforeLast('.')?.takeIf { it.isNotBlank() && !it.all { c -> c.isDigit() } }
+	if (fromSegment != null) return fromSegment
+
+	val path = uri.path?.let { Uri.decode(it) }
+	val fromPath = path?.substringAfterLast('/')?.substringBeforeLast('.')?.takeIf { it.isNotBlank() && !it.all { c -> c.isDigit() } }
+	if (fromPath != null) return fromPath
+
+	return lastSegment?.substringBeforeLast('.')?.takeIf { it.isNotBlank() } ?: "Track ${index + 1}"
 }
 
 fun formatSize(size: Long): String {

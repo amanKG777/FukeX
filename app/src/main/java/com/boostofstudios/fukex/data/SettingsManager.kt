@@ -13,6 +13,8 @@ object SettingsManager {
     private const val PREFS_NAME = "fukex_settings"
     private const val KEY_BIOMETRIC_ENABLED = "biometric_enabled"
     private const val KEY_BACKGROUND_PLAYBACK = "background_playback"
+    private const val KEY_VOICE_ASSISTANT_ENABLED = "voice_assistant_enabled"
+    private const val KEY_VOICE_ASSISTANT_BACKGROUND = "voice_assistant_background"
     private const val KEY_LOCK_TIMEOUT = "lock_timeout"
     private const val KEY_AMPLIFIER_LEVEL = "amplifier_level"
     private const val KEY_AMPLIFIER_ENABLED = "amplifier_enabled"
@@ -159,5 +161,21 @@ object SettingsManager {
 
     fun setReplayGainEnabled(context: Context, enabled: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_REPLAY_GAIN_ENABLED, enabled).apply()
+    }
+
+    fun isVoiceAssistantEnabled(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_VOICE_ASSISTANT_ENABLED, false)
+    }
+
+    fun setVoiceAssistantEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_VOICE_ASSISTANT_ENABLED, enabled).apply()
+    }
+
+    fun isVoiceAssistantBackgroundEnabled(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_VOICE_ASSISTANT_BACKGROUND, false)
+    }
+
+    fun setVoiceAssistantBackgroundEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_VOICE_ASSISTANT_BACKGROUND, enabled).apply()
     }
 }

@@ -97,7 +97,7 @@ fun YoutubeSearchScreen(onBack: () -> Unit, onVideoSelected: (String) -> Unit) {
                             headlineContent = { Text(video.title) },
                             supportingContent = { Text(video.channelTitle) },
                             modifier = Modifier.clickable {
-                                onVideoSelected("youtube://${video.id}")
+                                onVideoSelected("youtube://${video.id}?title=${android.net.Uri.encode(video.title)}")
                             }
                         )
                         HorizontalDivider()
