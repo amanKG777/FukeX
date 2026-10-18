@@ -17,6 +17,8 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.Lyrics
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -232,6 +234,31 @@ fun SettingsScreen(
 						modifier = Modifier.fillMaxWidth().clearAndSetSemantics {}
 					)
 				}
+			}
+			item {
+				SettingsHeader("Lyrics")
+				var isLyricsAnnounceEnabled by remember { mutableStateOf(SettingsManager.isLyricsAnnounceEnabled(context)) }
+				var isLyricsOnlineEnabled by remember { mutableStateOf(SettingsManager.isLyricsOnlineEnabled(context)) }
+				SettingsToggleItem(
+					title = "Read Lyrics Aloud",
+					subtitle = "TalkBack reads each synced lyric line as the song plays",
+					icon = Icons.Default.Lyrics,
+					checked = isLyricsAnnounceEnabled,
+					onCheckedChange = {
+						SettingsManager.setLyricsAnnounceEnabled(context, it)
+						isLyricsAnnounceEnabled = it
+					}
+				)
+				SettingsToggleItem(
+					title = "Find Lyrics Online",
+					subtitle = "When a song has no .lrc file next to it, look it up on lrclib.net using its title and artist",
+					icon = Icons.Default.CloudDownload,
+					checked = isLyricsOnlineEnabled,
+					onCheckedChange = {
+						SettingsManager.setLyricsOnlineEnabled(context, it)
+						isLyricsOnlineEnabled = it
+					}
+				)
 			}
 			item {
 				SettingsHeader("AI Voice Assistant")

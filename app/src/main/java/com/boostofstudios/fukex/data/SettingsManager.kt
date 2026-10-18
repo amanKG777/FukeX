@@ -178,4 +178,21 @@ object SettingsManager {
     fun setVoiceAssistantBackgroundEnabled(context: Context, enabled: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_VOICE_ASSISTANT_BACKGROUND, enabled).apply()
     }
+
+    // Off by default: TalkBack only reads lyric lines when the user opts in
+    fun isLyricsAnnounceEnabled(context: Context): Boolean = getPrefs(context).getBoolean(KEY_LYRICS_ANNOUNCE, false)
+
+    fun setLyricsAnnounceEnabled(context: Context, enabled: Boolean) = getPrefs(context).edit().putBoolean(KEY_LYRICS_ANNOUNCE, enabled).apply()
+
+    fun isLyricsOnlineEnabled(context: Context): Boolean = getPrefs(context).getBoolean(KEY_LYRICS_ONLINE, true)
+
+    fun setLyricsOnlineEnabled(context: Context, enabled: Boolean) = getPrefs(context).edit().putBoolean(KEY_LYRICS_ONLINE, enabled).apply()
+
+    fun getLastPlaylistId(context: Context): String? = getPrefs(context).getString(KEY_LAST_PLAYLIST_ID, null)
+
+    fun setLastPlaylistId(context: Context, id: String?) = getPrefs(context).edit().putString(KEY_LAST_PLAYLIST_ID, id).apply()
+
+    private const val KEY_LYRICS_ANNOUNCE = "lyrics_announce"
+    private const val KEY_LYRICS_ONLINE = "lyrics_online"
+    private const val KEY_LAST_PLAYLIST_ID = "last_playlist_id"
 }

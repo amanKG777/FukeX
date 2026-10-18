@@ -1,4 +1,4 @@
-package com.boostofstudios.fukex
+package com.boostofstudios.fukex.playback
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest

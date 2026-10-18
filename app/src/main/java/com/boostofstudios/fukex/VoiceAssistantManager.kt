@@ -8,6 +8,23 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import java.util.Locale
+import kotlinx.coroutines.flow.MutableStateFlow
+
+// The voice assistant plays through PlaybackEngine directly; this only asks the UI
+// to show the playlist it played from, and tells the assistant which locked playlists are open.
+object VoicePlayRequests {
+    val focusPlaylistId = MutableStateFlow<String?>(null)
+    val openDocs = MutableStateFlow(false)
+    @Volatile var unlockedPlaylistIds: Set<String> = emptySet()
+}
+
+fun playFeedbackBeep() {
+    try {
+        val tone = android.media.ToneGenerator(android.media.AudioManager.STREAM_MUSIC, 100)
+        tone.startTone(android.media.ToneGenerator.TONE_PROP_BEEP)
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ tone.release() }, 300)
+    } catch (e: Exception) {}
+}
 
 class VoiceAssistantManager(
     private val context: Context,
@@ -16,6 +33,7 @@ class VoiceAssistantManager(
 
     private var tts: TextToSpeech? = null
     private var speechRecognizer: SpeechRecognizer? = null
+    private var isListening = false
 
     // Lightweight Dictionary Mapping for Multiple Languages
     private val playKeywords = listOf("play", "chalao", "bajao", "reproducir", "pon")
@@ -66,6 +84,9 @@ class VoiceAssistantManager(
     }
 
     fun startListening() {
+        // The activity and the background service can both detect the same shake
+        if (isListening) return
+        isListening = true
         speak("Listening...") {
             android.os.Handler(android.os.Looper.getMainLooper()).post {
                 listenInternal()
@@ -90,10 +111,12 @@ class VoiceAssistantManager(
             override fun onBufferReceived(buffer: ByteArray?) {}
             override fun onEndOfSpeech() {}
             override fun onError(error: Int) {
+                isListening = false
                 playBeep()
                 speak("Sorry, I didn't catch that.")
             }
             override fun onResults(results: Bundle?) {
+                isListening = false
                 playBeep()
                 val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                 if (!matches.isNullOrEmpty()) {
@@ -106,62 +129,80 @@ class VoiceAssistantManager(
         speechRecognizer?.startListening(intent)
     }
 
-    private fun parseCommand(text: String) {
-        val lowerText = text.lowercase(Locale.getDefault())
+    private fun wordRegex(keyword: String) = Regex("(^|\\s)${Regex.escape(keyword)}(\\s|$)")
 
-        val isAmp = ampKeywords.any { lowerText.contains(it) }
+    private fun List<String>.matchIn(text: String): String? =
+        firstOrNull { wordRegex(it).containsMatchIn(text) }
+
+    private fun List<String>.foundIn(text: String) = matchIn(text) != null
+
+    private fun parseCommand(text: String) {
+        val lowerText = text.lowercase(Locale.getDefault()).trim()
+
+        // "play <song>" / "<song> bajao" comes first, so song names containing
+        // words like "stop", "back" or "help" don't trigger other commands.
+        val playMatch = playKeywords.matchIn(lowerText)
+        if (playMatch != null && !resumeKeywords.foundIn(lowerText) && (lowerText.startsWith("$playMatch ") || lowerText.endsWith(" $playMatch"))) {
+            val query = lowerText.removePrefix(playMatch).removeSuffix(playMatch).trim()
+            if (query.isNotEmpty() && !nextKeywords.foundIn(query) && !prevKeywords.foundIn(query)) {
+                onCommand("play", query)
+                return
+            }
+        }
+
+        val isAmp = ampKeywords.foundIn(lowerText)
         if (isAmp) {
-            if (increaseKeywords.any { lowerText.contains(it) }) {
+            if (increaseKeywords.foundIn(lowerText)) {
                 onCommand("amplifier_increase", null)
                 return
-            } else if (decreaseKeywords.any { lowerText.contains(it) }) {
+            } else if (decreaseKeywords.foundIn(lowerText)) {
                 onCommand("amplifier_decrease", null)
                 return
-            } else if (onKeywords.any { lowerText.contains(it) }) {
+            } else if (onKeywords.foundIn(lowerText)) {
                 onCommand("amplifier_on", null)
                 return
-            } else if (offKeywords.any { lowerText.contains(it) }) {
+            } else if (offKeywords.foundIn(lowerText)) {
                 onCommand("amplifier_off", null)
                 return
             }
         }
 
-        if (docKeywords.any { lowerText.contains(it) }) {
+        if (docKeywords.foundIn(lowerText)) {
             onCommand("open_docs", null)
             return
         }
 
-        if (pauseKeywords.any { lowerText.contains(it) }) {
-            onCommand("pause", null)
-            return
-        }
-
-        if (resumeKeywords.any { lowerText.contains(it) }) {
+        // Checked before pause/play so "wapas chalao" isn't read as "chalao"
+        if (resumeKeywords.foundIn(lowerText)) {
             onCommand("resume", null)
             return
         }
 
-        if (nextKeywords.any { lowerText.contains(it) }) {
+        if (pauseKeywords.foundIn(lowerText)) {
+            onCommand("pause", null)
+            return
+        }
+
+        if (nextKeywords.foundIn(lowerText)) {
             onCommand("next", null)
             return
         }
 
-        if (prevKeywords.any { lowerText.contains(it) }) {
+        if (prevKeywords.foundIn(lowerText)) {
             onCommand("previous", null)
             return
         }
 
-        val playMatch = playKeywords.find { lowerText.contains(it) }
         if (playMatch != null) {
-            val query = lowerText.replace(playMatch, "").trim()
+            val query = lowerText.replace(wordRegex(playMatch), " ").trim()
             onCommand("play", query.ifEmpty { null })
             return
         }
+
+        speak("Sorry, I didn't understand that.")
     }
 
-    private fun playBeep() {
-        android.media.ToneGenerator(android.media.AudioManager.STREAM_MUSIC, 100).startTone(android.media.ToneGenerator.TONE_PROP_BEEP)
-    }
+    private fun playBeep() = playFeedbackBeep()
 
     fun destroy() {
         tts?.stop()
