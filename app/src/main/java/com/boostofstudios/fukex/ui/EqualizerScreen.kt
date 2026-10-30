@@ -6,10 +6,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -54,7 +50,7 @@ private fun Picker(label: String, current: String, options: List<String>, onPick
 	Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
 		OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
 			Text("$label: $current")
-			Icon(Icons.Default.ArrowDropDown, null)
+			Icon(FxIcons.ArrowDropDown, null)
 		}
 		DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
 			options.forEach { option ->
@@ -84,7 +80,7 @@ fun EqualizerScreen(engine: PlaybackEngine, onBack: () -> Unit) {
 				title = { Text("Equalizer", modifier = Modifier.semantics { heading() }) },
 				navigationIcon = {
 					IconButton(onClick = onBack) {
-						Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+						Icon(FxIcons.ArrowBack, contentDescription = "Back")
 					}
 				}
 			)
@@ -109,7 +105,7 @@ fun EqualizerScreen(engine: PlaybackEngine, onBack: () -> Unit) {
 				SettingsToggleItem(
 					title = "Enable Equalizer",
 					subtitle = "10-band equalizer for ${route.label}",
-					icon = Icons.Default.Equalizer,
+					icon = FxIcons.Equalizer,
 					checked = config.enabled,
 					onCheckedChange = { update(config.copy(enabled = it)) }
 				)

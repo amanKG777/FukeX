@@ -1,12 +1,21 @@
 package com.boostofstudios.fukex
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
+import androidx.core.content.ContextCompat
 import java.util.Locale
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -20,193 +29,178 @@ object VoicePlayRequests {
 
 fun playFeedbackBeep() {
     try {
-        val tone = android.media.ToneGenerator(android.media.AudioManager.STREAM_MUSIC, 100)
+        val tone = android.media.ToneGenerator(AudioManager.STREAM_MUSIC, 100)
         tone.startTone(android.media.ToneGenerator.TONE_PROP_BEEP)
-        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ tone.release() }, 300)
+        Handler(Looper.getMainLooper()).postDelayed({ tone.release() }, 300)
     } catch (e: Exception) {}
 }
 
 class VoiceAssistantManager(
     private val context: Context,
-    private val onCommand: (String, String?) -> Unit
+    private val onCommand: (VoiceCommand) -> Unit
 ) {
+    companion object {
+        // If the recognizer never reports back, don't leave the assistant stuck "listening"
+        private const val LISTEN_WATCHDOG_MS = 20_000L
+        private const val MAX_ALTERNATIVES = 5
+    }
+
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
     private var tts: TextToSpeech? = null
+    private var ttsReady = false
     private var speechRecognizer: SpeechRecognizer? = null
     private var isListening = false
-
-    // Lightweight Dictionary Mapping for Multiple Languages
-    private val playKeywords = listOf("play", "chalao", "bajao", "reproducir", "pon")
-    private val pauseKeywords = listOf("pause", "stop", "ruk", "roko", "pausa")
-    private val resumeKeywords = listOf("resume", "continue", "wapas chalao", "reanudar")
-    private val nextKeywords = listOf("next", "skip", "agla", "siguiente")
-    private val prevKeywords = listOf("previous", "back", "pichla", "anterior")
-    private val ampKeywords = listOf("amplifier", "amp", "boost", "awaz badhao")
-    private val docKeywords = listOf("documentation", "help", "guide", "docs")
-    
-    private val onKeywords = listOf("on", "enable", "chalu", "encender")
-    private val offKeywords = listOf("off", "disable", "band", "apagar")
-    private val increaseKeywords = listOf("increase", "up", "badao", "subir")
-    private val decreaseKeywords = listOf("decrease", "down", "ghatao", "bajar")
+    private var focusRequest: AudioFocusRequest? = null
+    private val watchdog = Runnable {
+        if (isListening) {
+            speechRecognizer?.cancel()
+            finishListening()
+            speak("I didn't hear anything.")
+        }
+    }
 
     init {
         tts = TextToSpeech(context) { status ->
             if (status == TextToSpeech.SUCCESS) {
-                val loc = Locale.getDefault()
-                val res = tts?.setLanguage(loc)
+                val res = tts?.setLanguage(Locale.getDefault())
                 if (res == TextToSpeech.LANG_MISSING_DATA || res == TextToSpeech.LANG_NOT_SUPPORTED) {
                     tts?.language = Locale.US
                 }
+                tts?.setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build()
+                )
+                ttsReady = true
             }
         }
     }
 
     fun speak(text: String, onDone: (() -> Unit)? = null) {
-        if (onDone != null) {
-            val utteranceId = java.util.UUID.randomUUID().toString()
-            tts?.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
-                override fun onStart(utteranceId: String?) {}
-                override fun onDone(id: String?) {
-                    if (id == utteranceId) {
-                        onDone()
-                    }
-                }
-                override fun onError(utteranceId: String?) {
-                    onDone()
-                }
-            })
-            val params = Bundle()
-            params.putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, utteranceId)
-            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
-        } else {
-            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
+        val engine = tts
+        if (engine == null || !ttsReady) {
+            // Nothing will ever call back, so carry on instead of hanging
+            onDone?.let { mainHandler.post(it) }
+            return
         }
+        val utteranceId = java.util.UUID.randomUUID().toString()
+        engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(id: String?) {}
+            override fun onDone(id: String?) { if (id == utteranceId) onDone?.let { mainHandler.post(it) } }
+            @Deprecated("Deprecated in Java")
+            override fun onError(id: String?) { if (id == utteranceId) onDone?.let { mainHandler.post(it) } }
+            override fun onStop(id: String?, interrupted: Boolean) { if (id == utteranceId) onDone?.let { mainHandler.post(it) } }
+        })
+        val params = Bundle().apply { putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, utteranceId) }
+        engine.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
     }
 
     fun startListening() {
         // The activity and the background service can both detect the same shake
         if (isListening) return
-        isListening = true
-        speak("Listening...") {
-            android.os.Handler(android.os.Looper.getMainLooper()).post {
-                listenInternal()
-            }
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            speak("I need microphone permission. Please allow it in the app settings.")
+            return
         }
+        if (!SpeechRecognizer.isRecognitionAvailable(context)) {
+            speak("Speech recognition isn't available on this device.")
+            return
+        }
+        isListening = true
+        mainHandler.postDelayed(watchdog, LISTEN_WATCHDOG_MS)
+        // Quiet the music so it doesn't drown out the user, and so the prompt is heard
+        requestDuckFocus()
+        speak("Listening") { if (isListening) listenInternal() }
     }
 
     private fun listenInternal() {
-        if (speechRecognizer == null) {
-            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
-        }
+        // A recognizer that errored out can be left in a bad state, so each session gets a fresh one
+        speechRecognizer?.destroy()
+        val recognizer = SpeechRecognizer.createSpeechRecognizer(context)
+        speechRecognizer = recognizer
 
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, MAX_ALTERNATIVES)
+            putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
         }
 
-        speechRecognizer?.setRecognitionListener(object : RecognitionListener {
-            override fun onReadyForSpeech(params: Bundle?) {}
+        recognizer.setRecognitionListener(object : RecognitionListener {
+            override fun onReadyForSpeech(params: Bundle?) { playFeedbackBeep() }
             override fun onBeginningOfSpeech() {}
             override fun onRmsChanged(rmsdB: Float) {}
             override fun onBufferReceived(buffer: ByteArray?) {}
             override fun onEndOfSpeech() {}
             override fun onError(error: Int) {
-                isListening = false
-                playBeep()
-                speak("Sorry, I didn't catch that.")
+                finishListening()
+                speak(
+                    when (error) {
+                        SpeechRecognizer.ERROR_NO_MATCH -> "Sorry, I didn't catch that."
+                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "I didn't hear anything."
+                        SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT, SpeechRecognizer.ERROR_SERVER ->
+                            "Speech recognition needs an internet connection."
+                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "I need microphone permission."
+                        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "The speech service is busy. Try again in a moment."
+                        else -> "Something went wrong with speech recognition."
+                    }
+                )
             }
             override fun onResults(results: Bundle?) {
-                isListening = false
-                playBeep()
-                val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                if (!matches.isNullOrEmpty()) {
-                    parseCommand(matches[0])
+                finishListening()
+                val heard = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION).orEmpty()
+                if (heard.isEmpty()) {
+                    speak("Sorry, I didn't catch that.")
+                    return
+                }
+                val command = VoiceCommandParser.parse(heard)
+                if (command == null) {
+                    speak("Sorry, I didn't understand \"${heard.first()}\". Say help for what I can do.")
+                } else {
+                    onCommand(command)
                 }
             }
             override fun onPartialResults(partialResults: Bundle?) {}
             override fun onEvent(eventType: Int, params: Bundle?) {}
         })
-        speechRecognizer?.startListening(intent)
+        recognizer.startListening(intent)
     }
 
-    private fun wordRegex(keyword: String) = Regex("(^|\\s)${Regex.escape(keyword)}(\\s|$)")
-
-    private fun List<String>.matchIn(text: String): String? =
-        firstOrNull { wordRegex(it).containsMatchIn(text) }
-
-    private fun List<String>.foundIn(text: String) = matchIn(text) != null
-
-    private fun parseCommand(text: String) {
-        val lowerText = text.lowercase(Locale.getDefault()).trim()
-
-        // "play <song>" / "<song> bajao" comes first, so song names containing
-        // words like "stop", "back" or "help" don't trigger other commands.
-        val playMatch = playKeywords.matchIn(lowerText)
-        if (playMatch != null && !resumeKeywords.foundIn(lowerText) && (lowerText.startsWith("$playMatch ") || lowerText.endsWith(" $playMatch"))) {
-            val query = lowerText.removePrefix(playMatch).removeSuffix(playMatch).trim()
-            if (query.isNotEmpty() && !nextKeywords.foundIn(query) && !prevKeywords.foundIn(query)) {
-                onCommand("play", query)
-                return
-            }
-        }
-
-        val isAmp = ampKeywords.foundIn(lowerText)
-        if (isAmp) {
-            if (increaseKeywords.foundIn(lowerText)) {
-                onCommand("amplifier_increase", null)
-                return
-            } else if (decreaseKeywords.foundIn(lowerText)) {
-                onCommand("amplifier_decrease", null)
-                return
-            } else if (onKeywords.foundIn(lowerText)) {
-                onCommand("amplifier_on", null)
-                return
-            } else if (offKeywords.foundIn(lowerText)) {
-                onCommand("amplifier_off", null)
-                return
-            }
-        }
-
-        if (docKeywords.foundIn(lowerText)) {
-            onCommand("open_docs", null)
-            return
-        }
-
-        // Checked before pause/play so "wapas chalao" isn't read as "chalao"
-        if (resumeKeywords.foundIn(lowerText)) {
-            onCommand("resume", null)
-            return
-        }
-
-        if (pauseKeywords.foundIn(lowerText)) {
-            onCommand("pause", null)
-            return
-        }
-
-        if (nextKeywords.foundIn(lowerText)) {
-            onCommand("next", null)
-            return
-        }
-
-        if (prevKeywords.foundIn(lowerText)) {
-            onCommand("previous", null)
-            return
-        }
-
-        if (playMatch != null) {
-            val query = lowerText.replace(wordRegex(playMatch), " ").trim()
-            onCommand("play", query.ifEmpty { null })
-            return
-        }
-
-        speak("Sorry, I didn't understand that.")
+    private fun finishListening() {
+        isListening = false
+        mainHandler.removeCallbacks(watchdog)
+        releaseDuckFocus()
     }
 
-    private fun playBeep() = playFeedbackBeep()
+    private fun requestDuckFocus() {
+        val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build()
+            )
+            .setOnAudioFocusChangeListener {}
+            .build()
+        focusRequest = request
+        audioManager.requestAudioFocus(request)
+    }
+
+    private fun releaseDuckFocus() {
+        focusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
+        focusRequest = null
+    }
 
     fun destroy() {
+        mainHandler.removeCallbacks(watchdog)
+        releaseDuckFocus()
         tts?.stop()
         tts?.shutdown()
         speechRecognizer?.destroy()
+        tts = null
+        speechRecognizer = null
     }
 }

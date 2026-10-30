@@ -195,4 +195,16 @@ object SettingsManager {
     private const val KEY_LYRICS_ANNOUNCE = "lyrics_announce"
     private const val KEY_LYRICS_ONLINE = "lyrics_online"
     private const val KEY_LAST_PLAYLIST_ID = "last_playlist_id"
+
+    fun isIconPackEnabled(context: Context): Boolean = getPrefs(context).getBoolean(KEY_ICON_PACK_ENABLED, true)
+
+    fun setIconPackEnabled(context: Context, enabled: Boolean) = getPrefs(context).edit().putBoolean(KEY_ICON_PACK_ENABLED, enabled).apply()
+
+    // Whether the one-time "download the visual icons pack?" question has been answered
+    fun isIconPackPromptDone(context: Context): Boolean = getPrefs(context).getBoolean(KEY_ICON_PACK_PROMPT_DONE, false)
+
+    fun setIconPackPromptDone(context: Context, done: Boolean) = getPrefs(context).edit().putBoolean(KEY_ICON_PACK_PROMPT_DONE, done).apply()
+
+    private const val KEY_ICON_PACK_ENABLED = "icon_pack_enabled"
+    private const val KEY_ICON_PACK_PROMPT_DONE = "icon_pack_prompt_done"
 }

@@ -7,13 +7,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.FileUpload
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -93,29 +86,29 @@ fun PlaylistActionsDialog(
 				if (canModify) {
 					ListItem(
 						headlineContent = { Text("Move Left") },
-						leadingContent = { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) },
+						leadingContent = { Icon(FxIcons.ArrowBack, null) },
 						modifier = Modifier.clickable(onClick = onMoveLeft)
 					)
 					ListItem(
 						headlineContent = { Text("Move Right") },
-						leadingContent = { Icon(Icons.AutoMirrored.Filled.ArrowForward, null) },
+						leadingContent = { Icon(FxIcons.ArrowForward, null) },
 						modifier = Modifier.clickable(onClick = onMoveRight)
 					)
 					ListItem(
 						headlineContent = { Text(if (playlist.isHidden) "Unlock Playlist" else "Hide Playlist") },
-						leadingContent = { Icon(if (playlist.isHidden) Icons.Default.LockOpen else Icons.Default.Lock, null) },
+						leadingContent = { Icon(if (playlist.isHidden) FxIcons.LockOpen else FxIcons.Lock, null) },
 						modifier = Modifier.clickable(onClick = onToggleHidden)
 					)
 				}
 				ListItem(
 					headlineContent = { Text("Export Playlist") },
-					leadingContent = { Icon(Icons.Default.FileUpload, null) },
+					leadingContent = { Icon(FxIcons.FileUpload, null) },
 					modifier = Modifier.clickable(onClick = onExport)
 				)
 				if (canModify) {
 					ListItem(
 						headlineContent = { Text("Remove") },
-						leadingContent = { Icon(Icons.Default.Delete, null) },
+						leadingContent = { Icon(FxIcons.Delete, null) },
 						modifier = Modifier.clickable(onClick = onRemove)
 					)
 				}

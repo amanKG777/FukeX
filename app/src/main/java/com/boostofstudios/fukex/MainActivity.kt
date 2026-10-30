@@ -5,6 +5,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.fragment.app.FragmentActivity
 import com.boostofstudios.fukex.data.SettingsManager
@@ -90,7 +92,7 @@ class MainActivity : FragmentActivity() {
 		updateForegroundShakeDetector()
 
 		val commandHandler = VoiceCommandHandler(this) { voiceAssistantManager }
-		voiceAssistantManager = VoiceAssistantManager(this) { command, query -> commandHandler.handle(command, query) }
+		voiceAssistantManager = VoiceAssistantManager(this) { command -> commandHandler.handle(command) }
 
 		if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
 			registerReceiver(voiceAssistantReceiver, android.content.IntentFilter(PlaybackService.ACTION_VOICE_ASSISTANT), RECEIVER_NOT_EXPORTED)
@@ -100,9 +102,12 @@ class MainActivity : FragmentActivity() {
 		}
 
 		setContent {
-			FukeXTheme {
-				Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-					MainScreen(modifier = Modifier.padding(innerPadding))
+			val iconPack by com.boostofstudios.fukex.data.IconPackManager.active.collectAsState()
+			androidx.compose.runtime.CompositionLocalProvider(com.boostofstudios.fukex.ui.LocalIconPack provides iconPack) {
+				FukeXTheme {
+					Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+						MainScreen(modifier = Modifier.padding(innerPadding))
+					}
 				}
 			}
 		}

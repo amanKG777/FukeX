@@ -15,15 +15,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
-import androidx.compose.material.icons.automirrored.filled.QueueMusic
-import androidx.compose.material.icons.filled.Album
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Category
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -103,7 +94,7 @@ fun LibraryScreen(
 				title = { Text(openGroup ?: "Music Library", modifier = Modifier.semantics { heading() }) },
 				navigationIcon = {
 					IconButton(onClick = { if (openGroup != null) openGroup = null else onBack() }) {
-						Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = if (openGroup != null) "Back to ${grouping.label}" else "Back to playlists")
+						Icon(FxIcons.ArrowBack, contentDescription = if (openGroup != null) "Back to ${grouping.label}" else "Back to playlists")
 					}
 				}
 			)
@@ -174,9 +165,9 @@ private fun GroupList(tracks: List<LibraryTrack>, grouping: LibraryGrouping, onO
 		tracks.groupBy { MediaLibrary.groupKey(it, grouping) }.toSortedMap(String.CASE_INSENSITIVE_ORDER).toList()
 	}
 	val icon = when (grouping) {
-		LibraryGrouping.ARTISTS -> Icons.Default.Person
-		LibraryGrouping.ALBUMS -> Icons.Default.Album
-		else -> Icons.Default.Category
+		LibraryGrouping.ARTISTS -> FxIcons.Person
+		LibraryGrouping.ALBUMS -> FxIcons.Album
+		else -> FxIcons.Category
 	}
 	LazyColumn {
 		items(groups.size) { i ->
@@ -204,7 +195,7 @@ private fun SongList(
 			item {
 				Row(modifier = Modifier.fillMaxWidth().padding(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
 					Button(onClick = { engine.playTracks(queueName, songs.map { it.uri }, 0) }) {
-						Icon(Icons.Default.PlayArrow, null)
+						Icon(FxIcons.PlayArrow, null)
 						Text("Play all")
 					}
 					OutlinedButton(onClick = { onAdd(songs.map { it.uri }) }) {
@@ -216,14 +207,14 @@ private fun SongList(
 		items(songs.size) { i ->
 			val song = songs[i]
 			val actions = listOf(
-				MenuAction("Play next", Icons.AutoMirrored.Filled.QueueMusic) { engine.playNext(song.uri) },
-				MenuAction("Add to queue", Icons.AutoMirrored.Filled.QueueMusic) { engine.addToQueue(song.uri) },
-				MenuAction("Add to playlist", Icons.AutoMirrored.Filled.PlaylistAdd) { onAdd(listOf(song.uri)) }
+				MenuAction("Play next", FxIcons.QueueMusic) { engine.playNext(song.uri) },
+				MenuAction("Add to queue", FxIcons.QueueMusic) { engine.addToQueue(song.uri) },
+				MenuAction("Add to playlist", FxIcons.PlaylistAdd) { onAdd(listOf(song.uri)) }
 			)
 			ListItem(
 				headlineContent = { Text(song.title) },
 				supportingContent = { Text("${song.artist} · ${song.album} · ${formatTime(song.durationMs)}") },
-				leadingContent = { Icon(Icons.Default.MusicNote, null) },
+				leadingContent = { Icon(FxIcons.MusicNote, null) },
 				trailingContent = {
 					Box(modifier = Modifier.clearAndSetSemantics { }) { OverflowMenu("Song options", actions) }
 				},

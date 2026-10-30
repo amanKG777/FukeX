@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>FukeX Documentation</title>
+  <style>
+
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+
+ul.task-list[class]{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+font-size: inherit;
+width: 0.8em;
+margin: 0 0.8em 0.2em -1.6em;
+vertical-align: middle;
+}
+.display.math{display: block; text-align: center; margin: 0.5rem auto;}
+</style>
+  <style type="text/css">:root {
+--bg: #fbf9ff;
+--fg: #1d1b24;
+--muted: #5f5b6e;
+--accent: #5b3fc4;
+--accent-soft: #ece6ff;
+--line: #e3dff0;
+--code-bg: #f1eefb;
+}
+@media (prefers-color-scheme: dark) {
+:root {
+--bg: #15131b;
+--fg: #ece9f5;
+--muted: #aaa5bd;
+--accent: #b9a6ff;
+--accent-soft: #27223a;
+--line: #2f2a42;
+--code-bg: #1e1a2c;
+}
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+margin: 0;
+background: var(--bg);
+color: var(--fg);
+font: 1.0625rem/1.7 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+-webkit-text-size-adjust: 100%;
+}
+main {
+max-width: 46rem;
+margin: 0 auto;
+padding: 1.5rem 1.25rem 4rem;
+}
+.skip-link {
+position: absolute;
+left: -999px;
+top: 0;
+background: var(--accent);
+color: var(--bg);
+padding: .5rem 1rem;
+z-index: 10;
+}
+.skip-link:focus { left: 0; }
+h1, h2, h3 { line-height: 1.25; letter-spacing: -.01em; }
+h1 {
+font-size: clamp(2rem, 6vw, 2.8rem);
+margin: 1.5rem 0 1rem;
+}
+h2 {
+font-size: 1.45rem;
+margin: 2.6rem 0 .8rem;
+padding-bottom: .4rem;
+border-bottom: 2px solid var(--line);
+}
+h3 { font-size: 1.15rem; margin: 1.8rem 0 .5rem; color: var(--accent); }
+p { margin: .9rem 0; }
+a { color: var(--accent); text-underline-offset: .18em; }
+a:hover { text-decoration-thickness: 2px; }
+:focus-visible {
+outline: 3px solid var(--accent);
+outline-offset: 3px;
+border-radius: 4px;
+}
+ul, ol { padding-left: 1.4rem; }
+li { margin: .55rem 0; }
+li > p { margin: .3rem 0; }
+code, pre {
+font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+font-size: .92em;
+}
+code {
+background: var(--code-bg);
+padding: .12em .4em;
+border-radius: 6px;
+}
+pre {
+background: var(--code-bg);
+border: 1px solid var(--line);
+border-radius: 12px;
+padding: 1rem 1.1rem;
+overflow-x: auto;
+line-height: 1.5;
+}
+pre code { background: none; padding: 0; }
+blockquote {
+margin: 1rem 0;
+padding: .2rem 1rem;
+border-left: 4px solid var(--accent);
+background: var(--accent-soft);
+border-radius: 0 10px 10px 0;
+}
+img { max-width: 100%; height: auto; }
+hr { border: 0; border-top: 1px solid var(--line); margin: 2.5rem 0; }
+@media print {
+body { background: #fff; color: #000; }
+a { color: #000; }
+}
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<main id="main">
+<h1 id="fukex-documentation">FukeX Documentation</h1>
+<p>FukeX is a lightweight, easy-to-use Android media player written in
+Kotlin. It features a simple UI and was built specifically with screen
+readers in mind. We created FukeX because there were no good media
+players on the Android market that were both feature-rich and fully
+accessible. We are screen reader users ourselves, so we&#39;ve kept
+accessibility front and center, ensuring every step is easily navigable
+with tools like TalkBack.</p>
+<h2 id="what-is-special-about-fukex">What is special about FukeX?</h2>
+<p>We offer many features that other media players lack. Some of our
+favorites include:</p>
+<ul>
+<li><p>Up to 25-dB volume boost amplifier: Though I personally recommend
+maxing it out at 20dB, because if you increase it to 25dB, the sound
+might crack on some devices.</p></li>
+<li><p>Crossfading and gapless playback: Have a party playlist and want
+that DJ feel? This feature is for you! You can even set a different fade
+time for each thing that can interrupt a song.</p></li>
+<li><p>In-app playlist locking: Use this feature to hide your playlist
+with a PIN, a password, or your fingerprint. Note that it only hides the
+playlist within the app, not on the system level.</p></li>
+<li><p>Multi-playlist support: Want to switch between multiple
+playlists? Yeah, you can do that too! Our tabbed interface allows you to
+switch between playlists effortlessly.</p></li>
+<li><p>SMB share: The killer feature! Can you imagine? You don&#39;t need to
+keep all your songs on your phone. Just connect to an SMB server (like
+Tailscale on your home server or PC), and you can play songs directly
+from your PC to your phone via the media player!</p></li>
+<li><p>Import and export playlists: Move a playlist to another phone, or
+keep a backup, using a small JSON file.</p></li>
+<li><p>Resume where you left off: FukeX remembers the track and the
+position you stopped at, for every playlist separately.</p></li>
+<li><p>Full media notification: Play, pause, previous and next from the
+notification shade and the lock screen, without opening the
+app.</p></li>
+<li><p>Music library: Browse every song on your phone by song, artist,
+album or genre, and play it without adding it to a playlist
+first.</p></li>
+<li><p>Up Next queue: Play a track next, or add it to the end of the
+queue, without touching your playlist.</p></li>
+<li><p>10-band equalizer: With presets, a preamp, and separate settings
+for your speaker, wired headphones, Bluetooth and USB audio.</p></li>
+<li><p>Synced lyrics: Read along on the lyrics screen, or have TalkBack
+read each line as it is sung.</p></li>
+<li><p>Voice assistant: Shake your phone twice and tell FukeX what to
+play.</p></li>
+<li><p>Experimental YouTube support: Search YouTube and play a
+result.</p></li>
+<li><p>Android Auto: Browse and play your playlists from the car
+screen.</p></li>
+<li><p>Optional visual icon pack: A polished set of icons for every
+screen, menu and dialog, downloaded only if you want it.</p></li>
+</ul>
+<h2 id="what-files-can-fukex-play">What files can FukeX play?</h2>
+<p>FukeX plays these file types, both from your device and from an SMB
+share:</p>
+<p>mp3, mp4, m4a, aac, flac, wav, ogg, opus, alac, mkv, and webm.</p>
+<p>Video files are treated as audio only. If a file plays in FukeX but
+you selected it from a folder full of other stuff, don&#39;t worry, the file
+picker already hides everything that isn&#39;t playable.</p>
+<p>You need Android 8.0 or newer to run FukeX.</p>
+<h2 id="how-to-get-it">How to get it?</h2>
+<p>You can download FukeX to your device from our website:</p>
+<p>Click here to download FukeX</p>
+<h2 id="installing-the-apk-file">Installing the APK file</h2>
+<p>Once you obtain the APK file, here is how you install it:</p>
+<ol type="1">
+<li><p>Navigate to your file manager and choose the downloaded APK.
+Alternatively, if you are still on the Chrome page where you downloaded
+the APK, tap &quot;Customize and control Google Chrome&quot; (or &quot;More options&quot; if
+using another browser), then select &quot;Downloads&quot;, and directly access the
+APK file.</p></li>
+<li><p>Installing: When you tap the APK file, a system restriction
+screen for &quot;Unknown apps&quot; installation will pop up. Click the &quot;Settings&quot;
+button and toggle the switch that says &quot;Allow this installation&quot;. If you
+can&#39;t find the page to allow unknown app installations, go to your phone
+settings and search for &quot;Unknown apps&quot; or similar. After that, choose
+the app you plan to install FukeX with, like a browser or file
+manager.</p></li>
+<li><p>Confirm the installation: Once you&#39;re done with that hassle, tap
+&quot;Install&quot; to install the app. If you receive a Google Play scan warning,
+just let it do its job by tapping &quot;Scan&quot;. If you wanna be quick, use the
+&quot;Install without scanning&quot; TalkBack global accessibility
+action.</p></li>
+</ol>
+<p>Congrats! You&#39;ve successfully installed FukeX.</p>
+<h2 id="permissions-fukex-asks-for">Permissions FukeX asks for</h2>
+<p>The first time you open FukeX, it will ask for a few things. Here is
+what each one is for, so you&#39;re not left guessing:</p>
+<ul>
+<li><p>Notifications: So FukeX can show the playback notification with
+the play, pause, previous and next buttons. Say no and playback still
+works, you just lose those controls.</p></li>
+<li><p>All files access: FukeX uses its own file picker instead of the
+system one, because the system picker is painful with a screen reader.
+To browse your storage that way, Android needs this permission. FukeX
+explains this in a dialog first, and you can choose &quot;Open settings&quot; to
+grant it or &quot;Not now&quot; to skip. If you skip it, everything else still
+works and you can still play from an SMB share.</p></li>
+<li><p>Music and audio access: Lets the music library show the songs on
+your phone. Say no and the rest of the app still works.</p></li>
+<li><p>Microphone: Only used by the voice assistant, and only for the
+few seconds after you trigger it. FukeX asks for it when it first opens,
+but you can say no if you never plan to use the assistant.</p></li>
+<li><p>Internet: Used to reach your SMB server, to look up lyrics if you
+allow it, to search YouTube, to download the optional icon pack, and by
+your phone&#39;s speech recognition service for the voice assistant. FukeX
+does not phone home, and there are no ads or trackers.</p></li>
+<li><p>Vibration: A short buzz tells you the voice assistant heard your
+shake.</p></li>
+</ul>
+<h2 id="creating-your-first-playlist">Creating your first playlist</h2>
+<p>Wanna start listening to your favorite songs? Follow these steps:</p>
+<ol type="1">
+<li><p>Open the app, FukeX. Obviously, where else will you play the
+media, in the air?</p></li>
+<li><p>You will see the following options:</p></li>
+</ol>
+<ul>
+<li><p>Settings: This is used to go to the settings page.</p></li>
+<li><p>Import playlist: Loads a playlist you previously
+exported.</p></li>
+<li><p>Default playlist tab, selected: This is a default playlist, which
+is currently empty. You can create a new playlist, or add media to play
+directly here.</p></li>
+<li><p>Seekbar / now playing indicator bars.</p></li>
+<li><p>Music controls: Like play/pause, previous, next, more options,
+and finally, the button which will be useful here, &quot;Add media to
+playlist&quot;.</p></li>
+</ul>
+<p>Right here, we&#39;ll be adding a folder or song to the default playlist.
+Start by selecting the &quot;Add media to playlist&quot; button. It will present
+you with a dialog titled &quot;Add Media&quot;, asking &quot;Where would you like to
+add media from?&quot;</p>
+<p>You&#39;ll see the following options:</p>
+<ul>
+<li><p>Local device: Choose this option if the audio file you wanna play
+is in your device&#39;s storage. For now, we&#39;ll choose this option.</p></li>
+<li><p>SMB share: You can play songs from your home servers or your PC.
+Keep reading the documentation or jump to the heading if you wanna learn
+how to connect it.</p></li>
+</ul>
+<p>Finally, when choosing &quot;Local device&quot;, it will display a custom file
+picker where TalkBack accessibility gestures will work. Browse for the
+file you want to play, or if you want to select an entire folder, keep
+focus on the folder you want to add, and swipe with one finger to reveal
+the TalkBack action saying &quot;Add entire folder&quot;. As soon as you choose
+this, your playlist will be saved in a JSON file just in case, and your
+data stays only on your device.</p>
+<p>A couple of things worth knowing about the file picker:</p>
+<ul>
+<li><p>&quot;Add entire folder&quot; also grabs every subfolder inside it, so
+pointing it at your whole Music folder works fine.</p></li>
+<li><p>Big folders take a moment. You&#39;ll hear &quot;Scanning folder for media
+files&quot; while it works.</p></li>
+<li><p>The back gesture moves you up one folder. Press back at the top
+level and the picker closes.</p></li>
+<li><p>Media is always added to the playlist tab you currently have
+open, and it goes to the end of the list.</p></li>
+</ul>
+<p>As soon as you add the folder, your first song in the folder will
+start playing. You can pause it by clicking the pause button. Sure, I
+don&#39;t hope you are that dumb, anyway, now let&#39;s explore the rest of the
+player.</p>
+<h2 id="around-the-player-screen">Around the player screen</h2>
+<p>Once a playlist has media in it, the screen is split into two
+parts.</p>
+<p>The top part is the track list. Every track is a row you can tap to
+play. The one currently playing is marked with a play icon and is spoken
+as &quot;Playing&quot;.</p>
+<p>The bottom part is the playback bar, and it holds:</p>
+<ul>
+<li><p>Now playing line: Tells you the playlist name, and which track
+number you are on out of how many.</p></li>
+<li><p>Seek slider: Drag it, or use the TalkBack up and down swipe, to
+move within the song. It reads out as &quot;3:12 of 4:05&quot;.</p></li>
+<li><p>Previous and Next buttons: These are dimmed at the very start and
+the very end of a playlist, so you always know where you are.</p></li>
+<li><p>Play / Pause button.</p></li>
+<li><p>More options: Search, playlist info, amplifier toggle, playback
+effects, and the hide and remove actions for this playlist.</p></li>
+</ul>
+<p>FukeX saves your position roughly every five seconds and again
+whenever you leave a playlist. Come back later and it picks up the same
+track, at the same second.</p>
+<h2 id="reordering-and-removing-tracks">Reordering and removing
+tracks</h2>
+<p>Keep focus on any track in the list and swipe up or down with one
+finger to reveal its TalkBack actions:</p>
+<ul>
+<li><p>Move Up: Swaps the track with the one above it.</p></li>
+<li><p>Move Down: Swaps it with the one below.</p></li>
+<li><p>Remove: Takes the track out of the playlist. This never deletes
+the file from your storage, it only removes it from the list.</p></li>
+</ul>
+<p>If you remove the track that is playing, FukeX simply moves on to the
+next one, or to the new last track if you removed the one at the bottom.
+Playback only stops if you removed the very last track the playlist
+had.</p>
+<h2 id="searching-through-a-playlist">Searching through a playlist</h2>
+<p>Searching through a playlist is straightforward. Go to the playlist,
+and near the playback controls, you will see a 3-dots menu, or the &quot;More
+options&quot; button for TalkBack. You can either use the accessibility
+action or tap the button and select the &quot;Search&quot; option.</p>
+<p>After that, a text box will open up. Type the name of the song, and
+the result will pop up right next to the text box. Tap any result and it
+starts playing straight away, and the search closes itself.</p>
+<p>The search looks at track names and ignores capital letters, so
+typing &quot;night&quot; finds &quot;Night Drive&quot; just fine. Track names come from the
+file name with the extension trimmed off, which is why you see &quot;Night
+Drive&quot; rather than &quot;Night Drive.mp3&quot;.</p>
+<h2 id="playlist-info">Playlist info</h2>
+<p>Also in the 3-dots menu is &quot;Playlist info&quot;. It gives you a quick
+summary:</p>
+<ul>
+<li><p>Name of the playlist.</p></li>
+<li><p>Total tracks it contains.</p></li>
+<li><p>Total size on disk of all the tracks added together. Tracks that
+live on an SMB share are not measured, since that would mean asking the
+server about every single file. If any tracks were skipped, FukeX tells
+you how many.</p></li>
+<li><p>Whether the playlist is locked.</p></li>
+</ul>
+<p>Handy when you want to know whether that podcast dump is eating your
+storage.</p>
+<h2 id="creating-a-new-playlist">Creating a new playlist</h2>
+<p>Oh, so let&#39;s jump into creating your own playlists.</p>
+<p>Keep your focus on the default playlist tab, and using the TalkBack
+action, find the &quot;Create new playlist&quot; button. As soon as you activate
+it, a text box will pop up, asking you for the name of the playlist. You
+can name it anything. After providing a name, just press &quot;OK&quot;. When
+you&#39;re done with the creation of the playlist, make sure to add a media
+file! ROFL.</p>
+<p>The new playlist becomes the selected tab right away, so the very
+next thing you add lands in it.</p>
+<h2 id="managing-your-playlist-tabs">Managing your playlist tabs</h2>
+<p>Keep focus on a playlist tab and swipe up or down with one finger, or
+tap the 3-dots button sitting inside the tab, to get to these:</p>
+<ul>
+<li><p>Create new playlist: The same thing described above.</p></li>
+<li><p>Move Left and Move Right: Rearrange the order of your tabs. Put
+the playlist you use daily first, and stop swiping past four others
+every time.</p></li>
+<li><p>Hide: Locks the playlist behind a PIN or password. More on this
+below.</p></li>
+<li><p>Unlock: Only shows up on a playlist that is already
+locked.</p></li>
+<li><p>Export: Saves the playlist to a JSON file.</p></li>
+<li><p>Remove: Deletes the playlist itself. Again, your actual audio
+files are untouched.</p></li>
+</ul>
+<p>One small rule to keep in mind: while you only have a single
+playlist, moving, hiding and removing are not offered. FukeX always
+keeps at least one playlist around, otherwise you would have nowhere to
+add media.</p>
+<h2 id="importing-and-exporting-playlists">Importing and exporting
+playlists</h2>
+<p>An exported playlist is a tiny JSON file holding the playlist name
+and the location of every track. It does not contain the songs
+themselves, so it stays small, and it is easy to keep in your cloud
+storage as a backup.</p>
+<p>To export: use the &quot;Export&quot; action on a playlist tab, or &quot;Export
+Playlist&quot; from the tab&#39;s 3-dots dialog. Android will ask you where to
+save it and suggest the playlist name as the file name.</p>
+<p>To import: press the &quot;Import Playlist&quot; button in the top bar, and
+pick the JSON file. It always comes in as a brand new playlist, so
+importing twice gives you two copies rather than overwriting
+anything.</p>
+<p>Two honest warnings.</p>
+<p>Because the file stores locations and not the audio itself, an
+exported playlist only works on a phone that can reach those same
+locations. Moving a playlist of local files to a different phone will
+give you a list of tracks that refuse to play. Playlists made of SMB
+tracks travel much better, as long as the new phone can reach the same
+server.</p>
+<p>Exported playlists never contain your SMB username or password.
+That&#39;s good for sharing, but it does mean that after importing an SMB
+playlist on a new phone, you need to connect to that server once through
+&quot;Add media to playlist&quot; so FukeX learns the login. After that the
+imported tracks play normally.</p>
+<h2 id="locking-a-playlist">Locking a playlist</h2>
+<p>Got a playlist you&#39;d rather other people didn&#39;t stumble across? Use
+&quot;Hide&quot;.</p>
+<ol type="1">
+<li><p>Pick &quot;Hide&quot; from the tab&#39;s actions or from the 3-dots menu in the
+playback bar.</p></li>
+<li><p>Choose the type. &quot;PIN&quot; gives you a number keypad, &quot;Password&quot;
+gives you the full keyboard. Both need at least 4 characters.</p></li>
+<li><p>Type it in and press &quot;Hide&quot;.</p></li>
+</ol>
+<p>The playlist tab disappears from the row of tabs immediately, and a
+lock button appears in the top bar so you can get back to it. That lock
+button is only there while you actually have something locked.</p>
+<p>Please read this bit twice: if you forget your PIN or password, FukeX
+cannot get the playlist back for you. There is no reset, no email, no
+recovery question.</p>
+<p>Also worth saying plainly, since we&#39;d rather be honest than sound
+impressive: this hides a playlist inside FukeX. It is not encryption.
+Your audio files stay exactly where they were on your storage, and any
+file manager can still see them. What FukeX does guarantee is that your
+PIN is never written down as you typed it, so someone reading FukeX&#39;s
+data files cannot simply read your PIN back out.</p>
+<h2 id="getting-back-into-a-locked-playlist">Getting back into a locked
+playlist</h2>
+<p>Press the lock button in the top bar. You&#39;ll get a list of every
+locked playlist. Choose one, and then either:</p>
+<ul>
+<li><p>Your fingerprint appears, if you turned on biometric unlock in
+settings. Your device PIN or pattern works here too, so a failed
+fingerprint isn&#39;t the end of the road, and if you dismiss it FukeX just
+falls back to asking for the playlist PIN.</p></li>
+<li><p>Or the PIN box appears, and you type what you set
+earlier.</p></li>
+</ul>
+<p>Either way, the playlist comes back as a normal tab and you can play
+it as usual. This is a temporary visit, though. FukeX relocks it based
+on your lock timeout setting.</p>
+<p>If you want the playlist to stop being locked altogether, use the
+&quot;Unlock&quot; action on its tab. It asks for the PIN or password one more
+time, and then the lock is removed for good.</p>
+<h2 id="lock-timeout">Lock timeout</h2>
+<p>In settings, &quot;Lock Timeout&quot; decides how soon a temporarily unlocked
+playlist goes back into hiding. Your choices:</p>
+<ul>
+<li><p>Immediate: Relocks the moment you leave the app.</p></li>
+<li><p>1 Minute, 2 Minutes or 5 Minutes: Relocks after that much time
+without you touching the playlist.</p></li>
+<li><p>When Screen Locks: Relocks when your screen turns off.</p></li>
+</ul>
+<p>There&#39;s one deliberate exception. A playlist that is actively playing
+does not relock underneath you on a timer, because having the music cut
+out mid-song would be a rubbish way to protect anything.</p>
+<h2 id="connecting-to-an-smb-share">Connecting to an SMB share</h2>
+<p>This is the feature we&#39;re proudest of. Your music can live on your
+PC, your NAS, or a home server, and FukeX streams it.</p>
+<ol type="1">
+<li><p>Press &quot;Add media to playlist&quot; and choose &quot;SMB Share&quot;.</p></li>
+<li><p>Fill in the connection screen:</p></li>
+</ol>
+<ul>
+<li><p>SMB URL: Something like smb://192.168.1.100/Music/. The smb://
+part is already filled in for you.</p></li>
+<li><p>Username: Leave it empty for a guest or public share.</p></li>
+<li><p>Password: Same, leave it empty if the share doesn&#39;t need
+one.</p></li>
+</ul>
+<ol start="3" type="1">
+<li>Press &quot;Connect&quot;.</li>
+</ol>
+<p>From there it behaves exactly like the local file picker. Browse into
+folders by tapping them, go back up with the back gesture or the &quot;Go up&quot;
+button, tap a track to add it, or use the &quot;Add entire folder&quot; TalkBack
+action to pull in a whole folder including everything nested inside
+it.</p>
+<p>Some practical notes:</p>
+<ul>
+<li><p>Over a home Wi-Fi network this is smooth. Over a slower link,
+give the first few seconds of a track time to buffer.</p></li>
+<li><p>FukeX keeps a cache of recently streamed audio, up to 500 MB, so
+replaying something you just heard doesn&#39;t hit the network again.
+Clearing the app&#39;s cache in Android settings empties it.</p></li>
+<li><p>If the connection details are wrong you&#39;ll get a clear &quot;Failed to
+access SMB&quot; message rather than a silent empty folder. If the server
+simply isn&#39;t answering, FukeX gives up after a few seconds instead of
+hanging forever.</p></li>
+<li><p>Your username and password are saved separately from your
+playlists, once per server. They are never written into a playlist file,
+so exporting an SMB playlist does not hand your password to anyone you
+send it to.</p></li>
+</ul>
+<h2 id="the-music-library">The music library</h2>
+<p>Tap the Music Library button on the main screen to see every song on
+your phone, read from Android&#39;s own media database. FukeX asks for
+permission to read your music the first time you open it.</p>
+<p>Use the buttons at the top to group the list by Songs, Artists,
+Albums or Genres, or type in the search field to find a song, artist or
+album. On a group, &quot;Play all&quot; starts playing it from the top and &quot;Add
+all to playlist&quot; copies it into a playlist of your choosing.</p>
+<p>On a single song, open &quot;Song options&quot; for Play next, Add to queue,
+and Add to playlist. Playing a song straight from the library never
+changes any of your playlists.</p>
+<h2 id="up-next-and-the-queue">Up Next and the queue</h2>
+<p>Every track on a playlist or in the library has &quot;Play next&quot; and &quot;Add
+to queue&quot; in its options. &quot;Play next&quot; puts the track right after the one
+that is playing, and &quot;Add to queue&quot; puts it after everything you already
+queued.</p>
+<p>Queued tracks are never copied into your playlist, and they do not
+move the saved position of the playlist. Open &quot;Up Next&quot; from the player
+to see what is coming. It marks the track that is playing as &quot;Now
+playing&quot; and your additions as &quot;Queued&quot;, and you can take a queued track
+out with &quot;Remove from queue&quot;.</p>
+<h2 id="the-equalizer">The equalizer</h2>
+<p>Open the 3-dots menu in the playback bar and choose &quot;Equalizer&quot;.</p>
+<ul>
+<li><p>Enable Equalizer: Turns the equalizer on or off.</p></li>
+<li><p>Preset: Flat, Bass Boost, Treble Boost, Vocal, Rock, Pop, Jazz,
+Classical, Electronic, Hip-Hop, Loudness or Spoken Word. Moving a band
+yourself switches the preset to Custom.</p></li>
+<li><p>Ten bands, from 31 Hz up to 16 kHz, each adjustable by up to 12
+dB either way. Swipe up or down on a band to change it, and the slider
+reads out its frequency and gain.</p></li>
+<li><p>Preamp: Lowers or raises the level before the bands, so a big
+boost does not clip. If a preset sounds distorted, pull the preamp down
+a few dB.</p></li>
+<li><p>Reset to flat: Puts every band back to zero.</p></li>
+<li><p>Editing: Each output keeps its own settings, for the phone
+speaker, wired headphones, Bluetooth, and USB audio. The &quot;Editing&quot; menu
+picks which one you are changing. FukeX switches to the matching
+settings by itself when you plug in or connect something, so headphones
+can sound different from the speaker.</p></li>
+</ul>
+<h2 id="lyrics">Lyrics</h2>
+<p>Open the 3-dots menu and choose &quot;Lyrics&quot;. FukeX looks for lyrics in
+this order: a copy it saved earlier, a .lrc file with the same name
+sitting next to the song, and finally the lrclib.net website.</p>
+<p>The lyrics screen shows the whole song, and &quot;Current line&quot; marks the
+line being sung when the lyrics are synced. If a song has no lyrics, the
+screen says so.</p>
+<p>Two settings control this, under Lyrics in the settings screen:</p>
+<ul>
+<li><p>Read Lyrics Aloud: TalkBack reads each synced line as it plays.
+Off by default, since it talks over your music.</p></li>
+<li><p>Find Lyrics Online: When there is no .lrc file, FukeX sends the
+song&#39;s title and artist to lrclib.net to look them up. Turn it off if
+you would rather nothing leave your phone.</p></li>
+</ul>
+<p>Lyrics that were found are saved on your phone, so each song is
+looked up only once.</p>
+<h2 id="adding-songs-from-youtube-experimental">Adding songs from
+YouTube (experimental)</h2>
+<p>In &quot;Add media to playlist&quot;, choose the YouTube option, type what you
+are looking for and press Search. Choose a result to play it. YouTube
+tracks are streamed, so they need an internet connection, and since this
+feature is experimental it may stop working whenever YouTube changes
+something on its side.</p>
+<h2 id="the-voice-assistant">The voice assistant</h2>
+<p>The voice assistant lets you control FukeX without touching the
+screen.</p>
+<p>To turn it on, open settings, find Voice Assistant, and switch on
+&quot;Enable Voice Assistant&quot;. Allow the microphone permission if you haven&#39;t
+yet. Then:</p>
+<ol type="1">
+<li>Shake your phone twice. You will feel a short buzz and hear
+&quot;Listening&quot;.</li>
+<li>Wait for the beep, then say a command.</li>
+<li>FukeX tells you what it is doing, or what it did not
+understand.</li>
+</ol>
+<p>While you talk, the music is turned down so it does not drown you
+out. Switch on &quot;Work in Background&quot; to use the assistant while FukeX is
+minimized and something is playing.</p>
+<p>Speech recognition is done by your phone&#39;s own speech service, which
+may need an internet connection depending on your device. If the
+assistant says it is not available, check that a speech recognition app,
+like Google, is installed and up to date.</p>
+<p>What you can say:</p>
+<ul>
+<li><p>Play something: &quot;Play Shape of You&quot;, or &quot;Tum Hi Ho bajao&quot;. FukeX
+looks in your playlists first, then in your music library, and only then
+on YouTube. If you name an artist or an album, it plays that whole
+artist or album.</p></li>
+<li><p>Play it later: &quot;Play Believer next&quot; or &quot;Add Believer to
+queue&quot;.</p></li>
+<li><p>Control playback: &quot;Pause&quot;, &quot;Stop&quot;, &quot;Resume&quot;, &quot;Play&quot;, &quot;Next&quot;,
+&quot;Previous&quot;, and &quot;Start over&quot; to restart the current track.</p></li>
+<li><p>Seek: &quot;Forward&quot;, &quot;Rewind&quot;, &quot;Forward 30 seconds&quot;, &quot;Go back 1
+minute&quot;. With no number, it moves 10 seconds.</p></li>
+<li><p>Volume: &quot;Volume up&quot;, &quot;Volume down&quot;, &quot;Louder&quot;, &quot;Quieter&quot;. This
+changes your phone&#39;s media volume.</p></li>
+<li><p>Ask what is playing: &quot;What&#39;s playing&quot; or &quot;What song is
+this&quot;.</p></li>
+<li><p>Amplifier: &quot;Amplifier on&quot;, &quot;Amplifier off&quot;, &quot;Amplifier increase&quot;,
+&quot;Amplifier decrease&quot;.</p></li>
+<li><p>Help: &quot;What can I say&quot; lists the commands out loud, and &quot;Open
+documentation&quot; brings up this page.</p></li>
+</ul>
+<p>A few commands also work in Hindi and Spanish, for example &quot;bajao&quot;,
+&quot;agla&quot;, &quot;pichla&quot;, &quot;siguiente&quot; and &quot;pausa&quot;.</p>
+<p>Song names that contain a command word are fine. &quot;Play Back in Black&quot;
+plays the song instead of going back, because &quot;play&quot; at the start of a
+sentence always wins.</p>
+<p>If the song is in a locked playlist that is not currently unlocked,
+the assistant tells you so rather than playing it. Unlock the playlist
+first and ask again. It also will not read out the name of a track from
+a locked playlist when you ask what is playing.</p>
+<p>If the assistant keeps missing you, speak a little slower and closer
+to the phone, in a quieter place. It tries the several alternatives the
+recognizer offers, so it forgives a mistake or two.</p>
+<h2 id="visual-icons">Visual icons</h2>
+<p>FukeX works fully with its standard icons. If you would like a more
+polished look, it can download an icon pack that restyles the icons on
+every screen, menu and dialog, and adds small icons beside the headings
+in settings. The pack is not built into the app. FukeX asks you about it
+the first time it opens, and downloads it from the FukeX page on GitHub
+only if you say yes.</p>
+<p>You can manage it any time in settings, under Visual Icons:</p>
+<ul>
+<li><p>Download Visual Icons: Fetches the pack. It is tiny, about 16
+KB.</p></li>
+<li><p>Use Visual Icons: Switches the pack on or off without deleting
+it.</p></li>
+<li><p>Check for icon updates: Looks for a newer version and installs
+it.</p></li>
+<li><p>Delete icon pack: Removes the pack and goes back to the standard
+icons.</p></li>
+</ul>
+<p>The pack is checked against a checksum before it is used, and a
+download that does not match is thrown away. The icons only change how
+things look. Button names, labels and everything TalkBack announces stay
+exactly the same with or without the pack.</p>
+<h2 id="android-auto">Android Auto</h2>
+<p>FukeX shows up in Android Auto and in other places that browse media,
+such as Wear OS. You can browse your playlists and pick a track from the
+car screen. Locked playlists are never shown there, and only trusted
+apps from Google and the system are allowed to browse your
+playlists.</p>
+<h2 id="controlling-playback-outside-the-app">Controlling playback
+outside the app</h2>
+<p>While something is playing, FukeX puts a notification in your shade
+with previous, play or pause, and next. It also appears on your lock
+screen, and the same controls work from your car, your smartwatch, and
+anywhere else Android surfaces media controls.</p>
+<p>Playback keeps going while you switch between tabs or open the
+library, the equalizer or the settings, and after you close the app,
+until you pause it or close the playlist.</p>
+<p>The play, pause and skip buttons on wired and Bluetooth headsets work
+too, including the double-press for next track that most earbuds
+use.</p>
+<p>The notification sticks around while paused so you can start playing
+again, and clears itself when you close the playlist.</p>
+<p>Tapping the notification body brings you straight back into
+FukeX.</p>
+<h2 id="sharing-the-sound-with-other-apps">Sharing the sound with other
+apps</h2>
+<p>FukeX plays nicely with whatever else is making noise on your
+phone:</p>
+<ul>
+<li><p>A phone call, or another media app taking over, pauses FukeX.
+When a call ends, FukeX picks up again on its own.</p></li>
+<li><p>Something short, like a navigation instruction or a TalkBack
+announcement over the media stream, quietly drops FukeX&#39;s volume for a
+moment instead of stopping it, then brings it back up.</p></li>
+<li><p>Unplugging your headphones pauses playback rather than blasting
+the song out of the phone speaker.</p></li>
+</ul>
+<h2 id="the-volume-amplifier">The volume amplifier</h2>
+<p>Some recordings are just quiet. The amplifier pushes them louder than
+Android normally allows.</p>
+<p>Set the level in settings, from 0 up to 25 dB in 5 dB steps. Then
+switch it on or off whenever you like from the 3-dots menu in the
+playback bar, without going back to settings, since the menu item tells
+you the current level, for example &quot;Enable Amplifier (Boost 10dB)&quot;.</p>
+<p>Above 15 dB, FukeX shows a warning before applying it. That warning
+is not decoration. Pushing a small phone speaker that hard for a long
+time can genuinely damage it, and heavily boosted audio tends to
+distort. 20 dB is our sweet spot, 25 dB is there for the brave.</p>
+<h2 id="playback-effects-speed-pitch-and-bass-boost">Playback effects:
+speed, pitch and bass boost</h2>
+<p>Sometimes you want a track a little faster, a lecture a little
+slower, or just more thump in your headphones. Open the 3-dots menu in
+the playback bar and choose &quot;Playback Effects&quot; for three sliders in one
+dialog:</p>
+<ul>
+<li><p>Playback Speed: From 0.5x up to 2x. Slow down a podcast to catch
+every word, or speed through an audiobook you&#39;ve already heard a hundred
+times.</p></li>
+<li><p>Playback Pitch: Also 0.5x up to 2x, and it&#39;s independent of
+speed, so you can change one without dragging the other along with
+it.</p></li>
+<li><p>Bass Boost: Off by default, up to a level of 1000 in steps of
+100. Turn it up when your headphones just aren&#39;t giving you the low end
+you want.</p></li>
+</ul>
+<p>All three take effect immediately and are remembered the next time
+you open FukeX, so you only have to set them once.</p>
+<h2 id="evening-out-the-volume-between-tracks">Evening out the volume
+between tracks</h2>
+<p>Ever get blasted by one song right after a quiet one? That&#39;s what
+ReplayGain is for. Turn on &quot;Enable ReplayGain&quot; in settings, under
+Playback, and FukeX will read the volume tag that most music library
+tools already write into your files, then adjust each track to a
+consistent loudness on the fly.</p>
+<p>It&#39;s off by default, since not every file has the tag, but if you&#39;ve
+got a mixed playlist and keep reaching for the volume button, switch it
+on and forget about it. Tracks without the tag just play at their normal
+volume.</p>
+<h2 id="fading-and-gapless-playback">Fading and gapless playback</h2>
+<p>This is what gives FukeX that DJ feel. Rather than one blunt
+crossfade setting, you get to choose a fade time for each event
+separately.</p>
+<p>In settings, under &quot;Fading (Gapless Playback)&quot;, first pick the
+event:</p>
+<ul>
+<li><p>Seek: When you jump around inside a track with the
+slider.</p></li>
+<li><p>Pause/Play: When you press pause or play.</p></li>
+<li><p>Manual Track Change: When you press next or previous, or tap a
+track in the list.</p></li>
+<li><p>Automatic Track Change: When one track ends and the next begins
+on its own. This is the classic crossfade, and it&#39;s the one to set for a
+party playlist.</p></li>
+</ul>
+<p>Then set two sliders for that event:</p>
+<ul>
+<li><p>Fade In: How long the incoming audio takes to reach full
+volume.</p></li>
+<li><p>Fade Out: How long the outgoing audio takes to go quiet.</p></li>
+</ul>
+<p>Both go from 0 up to 10 seconds. Zero means disabled, so that event
+switches instantly with no fade at all. Everything starts at zero, so
+FukeX behaves like a plain player until you decide otherwise.</p>
+<p>A good starting point: around 300 ms for Pause/Play and Seek, so it
+feels soft rather than jarring, and 3 to 5 seconds on Automatic Track
+Change for proper crossfading between songs.</p>
+<p>Changing the event in the dropdown swaps the sliders to that event&#39;s
+own values, so each of the four keeps its own settings.</p>
+<h2 id="the-settings-screen">The settings screen</h2>
+<p>In the settings screen, you&#39;ll see the following options, grouped
+under headings:</p>
+<h3 id="security">Security</h3>
+<ul>
+<li><p>Biometric Unlock: This switch is used to toggle whether your
+locked playlists can be opened with your fingerprint or face instead of
+typing the PIN. Turning it on asks you to authenticate once, to prove
+it&#39;s really you. If your device has no biometrics set up, FukeX tells
+you so instead of silently doing nothing.</p></li>
+<li><p>Lock Timeout: Configures how long a temporarily unlocked playlist
+stays open. Options are Immediate, 1 Minute, 2 Minutes, 5 Minutes, and
+When Screen Locks.</p></li>
+<li><p>Exit Prompt: Asks you for confirmation before closing the app.
+Off by default. Handy if you keep hitting back one time too
+many.</p></li>
+</ul>
+<h3 id="playback">Playback</h3>
+<ul>
+<li><p>Background Playback: Enable this to keep the media playing when
+you minimize the app. This one is on by default, because a media player
+that stops when you check a message is not much of a media
+player.</p></li>
+<li><p>Skip Silence: Automatically speeds through quiet or silent parts
+in the audio. Brilliant for lectures and podcasts, not recommended for
+music, since it will chew through the quiet passages you actually
+wanted.</p></li>
+<li><p>Skip Unavailable Tracks: Automatically skips any media that fails
+to load or cannot be played, and shows a short &quot;Skipping unavailable
+track&quot; message. Useful for SMB playlists where the server might be
+asleep. With it off, FukeX stops and tells you exactly what went wrong
+instead, which is what you want when you&#39;re trying to work out why
+something won&#39;t play.</p></li>
+<li><p>Amplifier Boost: Adjust the volume boost from 0 up to 25 dB,
+though a warning pops up above 15 dB.</p></li>
+<li><p>Enable ReplayGain: Automatically levels out the volume between
+quiet and loud tracks, using the ReplayGain tag your files already carry
+if your music library tool wrote one. Off by default.</p></li>
+</ul>
+<h3 id="lyrics-1">Lyrics</h3>
+<ul>
+<li>Read Lyrics Aloud and Find Lyrics Online, described in the lyrics
+section above.</li>
+</ul>
+<h3 id="visual-icons-1">Visual Icons</h3>
+<ul>
+<li>Download, switch on or off, update or delete the optional icon pack,
+described in the visual icons section above.</li>
+</ul>
+<h3 id="voice-assistant">Voice Assistant</h3>
+<ul>
+<li><p>Enable Voice Assistant: Lets you shake your phone twice to give a
+voice command.</p></li>
+<li><p>Work in Background: Also listens for the shake while FukeX is
+minimized and something is playing. This only watches the motion sensor,
+the microphone stays off until you shake.</p></li>
+</ul>
+<h3 id="fading-gapless-playback">Fading (Gapless Playback)</h3>
+<ul>
+<li>Event selector, plus the Fade In and Fade Out sliders described in
+the fading section above.</li>
+</ul>
+<h3 id="about">About</h3>
+<ul>
+<li><p>About FukeX: Version number, copyright and license
+information.</p></li>
+<li><p>Documentation and License: Open this page and the license from
+inside the app.</p></li>
+</ul>
+<h2 id="where-your-data-is-kept">Where your data is kept</h2>
+<p>Everything FukeX knows about you sits on your phone, in the app&#39;s own
+private storage:</p>
+<ul>
+<li><p>Your playlists, track order, and the position you stopped at,
+live in a file called playlists.json.</p></li>
+<li><p>Your playlist PINs live in that same file, but only as a
+scrambled fingerprint, never as the PIN you typed.</p></li>
+<li><p>Your SMB logins live in a separate private file of their own, one
+entry per server.</p></li>
+<li><p>Your settings, and your equalizer settings for each output, live
+in FukeX&#39;s private preferences.</p></li>
+<li><p>Lyrics that were found are saved in the app&#39;s cache
+folder.</p></li>
+<li><p>Streamed SMB audio is cached in the app&#39;s cache folder, up to 500
+MB. Local files are never cached, since they are already on your phone.
+Clearing the app&#39;s cache in Android settings empties it.</p></li>
+</ul>
+<p>FukeX never sends any of this anywhere. The only things that leave
+your phone are the ones you asked for: SMB traffic to your own server, a
+lyrics lookup to lrclib.net if &quot;Find Lyrics Online&quot; is on, downloading
+the optional icon pack from GitHub, YouTube searches and streams, and
+whatever your phone&#39;s speech service does with your voice when you use
+the assistant. Your playlists and your SMB logins are also kept out of
+Android&#39;s automatic cloud backup, so they don&#39;t quietly end up in your
+Google account. Uninstalling FukeX removes the lot. If you want a backup
+of your playlists, use the export feature.</p>
+<h2 id="tips-and-troubleshooting">Tips and troubleshooting</h2>
+<ul>
+<li><p>A track won&#39;t play. Turn &quot;Skip Unavailable Tracks&quot; off for a
+moment and try again, so FukeX shows you the actual error instead of
+skipping past it. The usual culprits are a file that has been moved or
+deleted, or an SMB server that isn&#39;t reachable.</p></li>
+<li><p>The file picker shows nothing. FukeX likely doesn&#39;t have the all
+files access permission. Go to Android settings, find FukeX, and grant
+it.</p></li>
+<li><p>No playback notification. Notification permission was denied.
+Grant it in Android settings under FukeX, notifications.</p></li>
+<li><p>Playback stops when I leave the app. Check that &quot;Background
+Playback&quot; is on in settings.</p></li>
+<li><p>Music sounds choppy at high volume. Lower the amplifier. Anything
+past 20 dB distorts on a lot of phones.</p></li>
+<li><p>My locked playlist keeps hiding itself. That&#39;s the lock timeout
+doing its job. Set it to a longer value, or unlock the playlist
+permanently.</p></li>
+<li><p>Playback pauses on its own. Check whether something else grabbed
+the audio, like a call or another player. This is deliberate, and FukeX
+resumes by itself after a call.</p></li>
+<li><p>The voice assistant does not respond to a shake. Check that
+&quot;Enable Voice Assistant&quot; is on and that the microphone permission was
+granted. Give the phone two firm shakes within a couple of seconds.
+Outside the app, &quot;Work in Background&quot; must be on and something must be
+playing.</p></li>
+<li><p>The voice assistant plays the wrong song. Say the full title, or
+add the artist&#39;s name. It plays the first match, looking through
+playlists first and then the music library.</p></li>
+<li><p>The music library is empty. FukeX needs the music and audio
+permission, and the songs must be marked as music by Android. Ringtones
+and recordings are left out.</p></li>
+<li><p>The icons did not change after downloading the pack. Check that
+&quot;Use Visual Icons&quot; is on in settings. If the download failed, try again
+on a stronger connection.</p></li>
+<li><p>The equalizer sounds distorted. Lower the preamp, or lower the
+bands you boosted.</p></li>
+<li><p>An imported SMB playlist won&#39;t play. Connect to that server once
+through &quot;Add media to playlist&quot;, so FukeX learns the login for
+it.</p></li>
+</ul>
+<h2 id="accessibility-quick-reference">Accessibility quick
+reference</h2>
+<p>Every action below is reachable by putting TalkBack focus on the item
+and swiping up or down with one finger.</p>
+<p>On a playlist tab: Create new playlist, Move Left, Move Right, Hide
+or Unlock, Export, Remove.</p>
+<p>On a track in the list: Move Up, Move Down, Remove.</p>
+<p>On the More options button: Search within playlist, Playlist info,
+Enable or Disable Amplifier, Playback Effects, Hide or Unlock,
+Remove.</p>
+<p>On a song in the music library: Play next, Add to queue, Add to
+playlist.</p>
+<p>On a queued track in Up Next: Remove from queue.</p>
+<p>On a folder in the file picker or SMB picker: Add entire folder.</p>
+<p>On the seek slider and every settings slider: swipe up and down to
+change the value. The slider reads out its current value as you go, in
+minutes and seconds for the seek bar, in decibels for the amplifier, in
+milliseconds for the fade settings, and as a multiplier or a plain level
+for the playback effects sliders.</p>
+</main>
+</body>
+</html>

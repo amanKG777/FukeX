@@ -6,6 +6,8 @@ import org.schabi.newpipe.extractor.NewPipe
 class FukeXApp : Application() {
     override fun onCreate() {
         super.onCreate()
+        // Reads the downloaded icon pack (if any) without holding up startup
+        Thread { com.boostofstudios.fukex.data.IconPackManager.load(this) }.start()
         try {
             org.schabi.newpipe.extractor.NewPipe.init(YoutubeDownloader.getInstance())
         } catch (e: Exception) {

@@ -16,13 +16,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.LibraryMusic
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.FileDownload
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -151,6 +144,7 @@ private fun MainScreenContent(initialPlaylists: List<Playlist>, modifier: Modifi
 	var showExitDialog by remember { mutableStateOf(false) }
 	var showStorageRationale by remember { mutableStateOf(false) }
 	var updateUrl by remember { mutableStateOf<String?>(null) }
+	var showIconPackPrompt by remember { mutableStateOf(!SettingsManager.isIconPackPromptDone(context)) }
 	val openDocs by VoicePlayRequests.openDocs.collectAsState()
 
 	val currentlyPlayingPlaylistId = if (engineState.isPlaying) engineState.playlistId else null
@@ -349,25 +343,25 @@ private fun MainScreenContent(initialPlaylists: List<Playlist>, modifier: Modifi
 					title = { Text("FukeX", modifier = Modifier.semantics { heading() }) },
 					actions = {
 						IconButton(onClick = { showLibrary = true }) {
-							Icon(Icons.Default.LibraryMusic, contentDescription = "Music Library")
+							Icon(FxIcons.LibraryMusic, contentDescription = "Music Library")
 						}
 						IconButton(onClick = { importLauncher.launch(arrayOf("application/json")) }) {
-							Icon(Icons.Default.FileDownload, contentDescription = "Import Playlist")
+							Icon(FxIcons.FileDownload, contentDescription = "Import Playlist")
 						}
 						if (playlists.any { it.isHidden && it.id !in unlockedPlaylistIds }) {
 							IconButton(onClick = { showPlaylistSelectionDialog = true }) {
-								Icon(Icons.Default.Lock, contentDescription = "View Locked Playlists")
+								Icon(FxIcons.Lock, contentDescription = "View Locked Playlists")
 							}
 						}
 						IconButton(onClick = { showSettings = true }) {
-							Icon(Icons.Default.Settings, contentDescription = "Settings")
+							Icon(FxIcons.Settings, contentDescription = "Settings")
 						}
 					}
 				)
 			},
 			floatingActionButton = {
 				FloatingActionButton(onClick = { showAddMediaDialog = true }) {
-					Icon(Icons.Default.Add, contentDescription = "Add Media to Playlist")
+					Icon(FxIcons.Add, contentDescription = "Add Media to Playlist")
 				}
 			}
 		) { scaffoldPadding ->
@@ -410,7 +404,7 @@ private fun MainScreenContent(initialPlaylists: List<Playlist>, modifier: Modifi
 							text = {
 								Row(verticalAlignment = Alignment.CenterVertically) {
 									if (playlist.isHidden) {
-										Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(16.dp))
+										Icon(FxIcons.Lock, contentDescription = null, modifier = Modifier.size(16.dp))
 										Spacer(Modifier.width(4.dp))
 									}
 									Text(playlist.name)
@@ -418,7 +412,7 @@ private fun MainScreenContent(initialPlaylists: List<Playlist>, modifier: Modifi
 										onClick = { showPlaylistActions = playlist },
 										modifier = Modifier.clearAndSetSemantics { }
 									) {
-										Icon(Icons.Default.MoreVert, contentDescription = null)
+										Icon(FxIcons.MoreVert, contentDescription = null)
 									}
 								}
 							}
@@ -458,6 +452,13 @@ private fun MainScreenContent(initialPlaylists: List<Playlist>, modifier: Modifi
 				},
 				onDismiss = { updateUrl = null }
 			)
+		}
+		// Asked once, and only after the more important first-run dialogs are out of the way
+		if (showIconPackPrompt && !showStorageRationale && updateUrl == null) {
+			IconPackPrompt(onFinished = {
+				SettingsManager.setIconPackPromptDone(context, true)
+				showIconPackPrompt = false
+			})
 		}
 		if (showStorageRationale) {
 			StorageRationaleDialog(

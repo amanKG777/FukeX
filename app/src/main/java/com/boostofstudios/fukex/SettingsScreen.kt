@@ -1,24 +1,13 @@
 package com.boostofstudios.fukex
+
+import com.boostofstudios.fukex.ui.FxIcons
+import com.boostofstudios.fukex.ui.IconPackSettingsItems
+import com.boostofstudios.fukex.data.IconPackManager
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Fingerprint
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.SettingsVoice
-import androidx.compose.material.icons.filled.LockClock
-import androidx.compose.material.icons.filled.PlayCircle
-import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.FastForward
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.Lyrics
-import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -106,7 +95,7 @@ fun SettingsScreen(
 				title = { Text("Settings", modifier = Modifier.semantics { heading() }) },
 				navigationIcon = {
 					IconButton(onClick = onBack) {
-						Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to playlists")
+						Icon(FxIcons.ArrowBack, contentDescription = "Back to playlists")
 					}
 				}
 			)
@@ -122,20 +111,20 @@ fun SettingsScreen(
 				SettingsToggleItem(
 					title = "Biometric Unlock",
 					subtitle = "Use fingerprint or face to unlock playlists",
-					icon = Icons.Default.Fingerprint,
+					icon = FxIcons.Fingerprint,
 					checked = isBiometricEnabled,
 					onCheckedChange = { authenticateAndEnableBiometrics(it) }
 				)
 				ListItem(
 					headlineContent = { Text("Lock Timeout") },
 					supportingContent = { Text("Automatically lock playlists after: ${lockTimeout.label}") },
-					leadingContent = { Icon(Icons.Default.LockClock, null) },
+					leadingContent = { Icon(FxIcons.LockClock, null) },
 					modifier = Modifier.clickable { showTimeoutDialog = true }
 				)
 				SettingsToggleItem(
 					title = "Exit Prompt",
 					subtitle = "Show confirmation dialog when closing app",
-					icon = Icons.Default.Info,
+					icon = FxIcons.Info,
 					checked = isExitPromptEnabled,
 					onCheckedChange = { 
 						SettingsManager.setExitPromptEnabled(context, it)
@@ -148,7 +137,7 @@ fun SettingsScreen(
 				SettingsToggleItem(
 					title = "Background Playback",
 					subtitle = "Keep playing when app is in background",
-					icon = Icons.Default.PlayCircle,
+					icon = FxIcons.PlayCircle,
 					checked = isBackgroundPlaybackEnabled,
 					onCheckedChange = { 
 						SettingsManager.setBackgroundPlaybackEnabled(context, it)
@@ -158,7 +147,7 @@ fun SettingsScreen(
 				SettingsToggleItem(
 					title = "Skip Silence",
 					subtitle = "Speed through quiet or silent parts (not recommended for music)",
-					icon = Icons.Default.FastForward,
+					icon = FxIcons.FastForward,
 					checked = isSkipSilenceEnabled,
 					onCheckedChange = { 
 						SettingsManager.setSkipSilenceEnabled(context, it)
@@ -168,7 +157,7 @@ fun SettingsScreen(
 				SettingsToggleItem(
 					title = "Skip Unavailable Tracks",
 					subtitle = "Automatically skip to the next track if a file cannot be played",
-					icon = Icons.Default.SkipNext,
+					icon = FxIcons.SkipNext,
 					checked = isSkipUnavailableEnabled,
 					onCheckedChange = { 
 						SettingsManager.setSkipUnavailableTracksEnabled(context, it)
@@ -178,7 +167,7 @@ fun SettingsScreen(
 				SettingsToggleItem(
 					title = "Enable ReplayGain",
 					subtitle = "Automatically normalize volume levels between tracks",
-					icon = Icons.Default.GraphicEq,
+					icon = FxIcons.GraphicEq,
 					checked = isReplayGainEnabled,
 					onCheckedChange = { 
 						SettingsManager.setReplayGainEnabled(context, it)
@@ -211,7 +200,7 @@ fun SettingsScreen(
 						}
 				) {
 					Row(verticalAlignment = Alignment.CenterVertically) {
-						Icon(Icons.AutoMirrored.Filled.VolumeUp, null, modifier = Modifier.padding(end = 16.dp))
+						Icon(FxIcons.VolumeUp, null, modifier = Modifier.padding(end = 16.dp))
 						Column {
 							Text("Amplifier Boost: ${amplifierLevel / 100} dB", style = MaterialTheme.typography.bodyLarge)
 							Text("Increase volume beyond standard limits.", style = MaterialTheme.typography.bodyMedium)
@@ -242,7 +231,7 @@ fun SettingsScreen(
 				SettingsToggleItem(
 					title = "Read Lyrics Aloud",
 					subtitle = "TalkBack reads each synced lyric line as the song plays",
-					icon = Icons.Default.Lyrics,
+					icon = FxIcons.Lyrics,
 					checked = isLyricsAnnounceEnabled,
 					onCheckedChange = {
 						SettingsManager.setLyricsAnnounceEnabled(context, it)
@@ -252,7 +241,7 @@ fun SettingsScreen(
 				SettingsToggleItem(
 					title = "Find Lyrics Online",
 					subtitle = "When a song has no .lrc file next to it, look it up on lrclib.net using its title and artist",
-					icon = Icons.Default.CloudDownload,
+					icon = FxIcons.CloudDownload,
 					checked = isLyricsOnlineEnabled,
 					onCheckedChange = {
 						SettingsManager.setLyricsOnlineEnabled(context, it)
@@ -261,14 +250,14 @@ fun SettingsScreen(
 				)
 			}
 			item {
-				SettingsHeader("AI Voice Assistant")
+				SettingsHeader("Voice Assistant")
 				var isVoiceAssistantEnabled by remember { mutableStateOf(SettingsManager.isVoiceAssistantEnabled(context)) }
 				var isVoiceAssistantBackgroundEnabled by remember { mutableStateOf(SettingsManager.isVoiceAssistantBackgroundEnabled(context)) }
 				
 				SettingsToggleItem(
 					title = "Enable Voice Assistant",
-					subtitle = "Triple-press Volume Down to trigger AI helper",
-					icon = Icons.Default.Mic,
+					subtitle = "Shake your phone twice to talk to the voice assistant",
+					icon = FxIcons.Mic,
 					checked = isVoiceAssistantEnabled,
 					onCheckedChange = { 
 						SettingsManager.setVoiceAssistantEnabled(context, it)
@@ -279,7 +268,7 @@ fun SettingsScreen(
 					SettingsToggleItem(
 						title = "Work in Background",
 						subtitle = "Trigger assistant even when app is minimized (during playback)",
-						icon = Icons.Default.SettingsVoice,
+						icon = FxIcons.SettingsVoice,
 						checked = isVoiceAssistantBackgroundEnabled,
 						onCheckedChange = { 
 							SettingsManager.setVoiceAssistantBackgroundEnabled(context, it)
@@ -289,11 +278,30 @@ fun SettingsScreen(
 				}
 			}
 			item {
+				SettingsHeader("Visual Icons")
+				var showDeleteIconPack by remember { mutableStateOf(false) }
+				IconPackSettingsItems(onDeleteRequested = { showDeleteIconPack = true })
+				if (showDeleteIconPack) {
+					AlertDialog(
+						onDismissRequest = { showDeleteIconPack = false },
+						title = { Text("Delete icon pack?") },
+						text = { Text("FukeX goes back to its built-in icons. You can download the pack again any time.") },
+						confirmButton = {
+							TextButton(onClick = {
+								IconPackManager.remove(context)
+								showDeleteIconPack = false
+							}) { Text("Delete") }
+						},
+						dismissButton = { TextButton(onClick = { showDeleteIconPack = false }) { Text("Cancel") } }
+					)
+				}
+			}
+			item {
 				SettingsHeader("Fading (Gapless Playback)")
 				Box(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
 					OutlinedButton(onClick = { fadeMenuExpanded = true }, modifier = Modifier.fillMaxWidth()) {
 						Text("Event: $selectedFadeEvent")
-						Icon(Icons.Default.ArrowDropDown, null)
+						Icon(FxIcons.ArrowDropDown, null)
 					}
 					DropdownMenu(
 						expanded = fadeMenuExpanded,
@@ -362,7 +370,7 @@ fun SettingsScreen(
 				ListItem(
 					headlineContent = { Text("About FukeX") },
 					supportingContent = { Text("Version ${BuildConfig.VERSION_NAME}, Copyright info, and license") },
-					leadingContent = { Icon(Icons.Default.Info, null) },
+					leadingContent = { Icon(FxIcons.Info, null) },
 					modifier = Modifier.clickable { showAboutScreen = true }
 				)
 			}
@@ -428,7 +436,7 @@ fun AboutScreen(onBack: () -> Unit) {
 				title = { Text("About FukeX") },
 				navigationIcon = {
 					IconButton(onClick = onBack) {
-						Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to settings")
+						Icon(FxIcons.ArrowBack, contentDescription = "Back to settings")
 					}
 				}
 			)
@@ -481,7 +489,7 @@ fun DocumentationScreen(onBack: () -> Unit) {
 				title = { Text("Documentation") },
 				navigationIcon = {
 					IconButton(onClick = onBack) {
-						Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+						Icon(FxIcons.ArrowBack, contentDescription = "Back")
 					}
 				}
 			)
@@ -511,7 +519,7 @@ fun LicenseScreen(onBack: () -> Unit) {
 				title = { Text("License") },
 				navigationIcon = {
 					IconButton(onClick = onBack) {
-						Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+						Icon(FxIcons.ArrowBack, contentDescription = "Back")
 					}
 				}
 			)
@@ -538,16 +546,40 @@ fun LicenseScreen(onBack: () -> Unit) {
 	}
 }
 
+private val sectionIcons = mapOf(
+	"Security" to "section_security",
+	"Playback" to "section_playback",
+	"Lyrics" to "section_lyrics",
+	"Voice Assistant" to "section_voice",
+	"Fading (Gapless Playback)" to "section_fading",
+	"Visual Icons" to "section_icons",
+	"About" to "section_about"
+)
+
 @Composable
 fun SettingsHeader(title: String) {
-	Text(
-		text = title,
-		style = MaterialTheme.typography.labelLarge,
-		color = MaterialTheme.colorScheme.primary,
-		modifier = Modifier
-			.padding(horizontal = 16.dp, vertical = 8.dp)
-			.semantics { heading() }
-	)
+	// Only drawn when an icon pack provides one; without a pack the header is plain text as before
+	val decoration = sectionIcons[title]?.let { FxIcons.decoration(it) }
+	val text: @Composable () -> Unit = {
+		Text(
+			text = title,
+			style = MaterialTheme.typography.labelLarge,
+			color = MaterialTheme.colorScheme.primary,
+			modifier = Modifier.semantics { heading() }
+		)
+	}
+	if (decoration == null) {
+		Box(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) { text() }
+	} else {
+		Row(
+			modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+			verticalAlignment = Alignment.CenterVertically
+		) {
+			Icon(decoration, null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+			Spacer(Modifier.width(10.dp))
+			text()
+		}
+	}
 }
 
 @Composable
@@ -598,7 +630,7 @@ fun FadeSliderItem(title: String, msValue: Int, onValueChange: (Int) -> Unit) {
 			}
 	) {
 		Row(verticalAlignment = Alignment.CenterVertically) {
-			Icon(Icons.Default.GraphicEq, null, modifier = Modifier.padding(end = 16.dp))
+			Icon(FxIcons.GraphicEq, null, modifier = Modifier.padding(end = 16.dp))
 			Column {
 				Text(title, style = MaterialTheme.typography.bodyLarge)
 				Text(if (msValue == 0) "Disabled" else "$msValue ms", style = MaterialTheme.typography.bodyMedium)

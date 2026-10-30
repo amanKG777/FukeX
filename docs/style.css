@@ -1,0 +1,120 @@
+:root {
+	--bg: #fbf9ff;
+	--fg: #1d1b24;
+	--muted: #5f5b6e;
+	--accent: #5b3fc4;
+	--accent-soft: #ece6ff;
+	--line: #e3dff0;
+	--code-bg: #f1eefb;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--bg: #15131b;
+		--fg: #ece9f5;
+		--muted: #aaa5bd;
+		--accent: #b9a6ff;
+		--accent-soft: #27223a;
+		--line: #2f2a42;
+		--code-bg: #1e1a2c;
+	}
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--fg);
+	font: 1.0625rem/1.7 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+	-webkit-text-size-adjust: 100%;
+}
+
+main {
+	max-width: 46rem;
+	margin: 0 auto;
+	padding: 1.5rem 1.25rem 4rem;
+}
+
+.skip-link {
+	position: absolute;
+	left: -999px;
+	top: 0;
+	background: var(--accent);
+	color: var(--bg);
+	padding: .5rem 1rem;
+	z-index: 10;
+}
+.skip-link:focus { left: 0; }
+
+h1, h2, h3 { line-height: 1.25; letter-spacing: -.01em; }
+
+h1 {
+	font-size: clamp(2rem, 6vw, 2.8rem);
+	margin: 1.5rem 0 1rem;
+}
+
+h2 {
+	font-size: 1.45rem;
+	margin: 2.6rem 0 .8rem;
+	padding-bottom: .4rem;
+	border-bottom: 2px solid var(--line);
+}
+
+h3 { font-size: 1.15rem; margin: 1.8rem 0 .5rem; color: var(--accent); }
+
+p { margin: .9rem 0; }
+
+a { color: var(--accent); text-underline-offset: .18em; }
+a:hover { text-decoration-thickness: 2px; }
+
+:focus-visible {
+	outline: 3px solid var(--accent);
+	outline-offset: 3px;
+	border-radius: 4px;
+}
+
+ul, ol { padding-left: 1.4rem; }
+li { margin: .55rem 0; }
+li > p { margin: .3rem 0; }
+
+code, pre {
+	font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+	font-size: .92em;
+}
+
+code {
+	background: var(--code-bg);
+	padding: .12em .4em;
+	border-radius: 6px;
+}
+
+pre {
+	background: var(--code-bg);
+	border: 1px solid var(--line);
+	border-radius: 12px;
+	padding: 1rem 1.1rem;
+	overflow-x: auto;
+	line-height: 1.5;
+}
+
+pre code { background: none; padding: 0; }
+
+blockquote {
+	margin: 1rem 0;
+	padding: .2rem 1rem;
+	border-left: 4px solid var(--accent);
+	background: var(--accent-soft);
+	border-radius: 0 10px 10px 0;
+}
+
+img { max-width: 100%; height: auto; }
+
+hr { border: 0; border-top: 1px solid var(--line); margin: 2.5rem 0; }
+
+@media print {
+	body { background: #fff; color: #000; }
+	a { color: #000; }
+}

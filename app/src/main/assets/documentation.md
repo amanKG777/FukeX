@@ -22,6 +22,22 @@ We offer many features that other media players lack. Some of our favorites incl
 
 * Full media notification: Play, pause, previous and next from the notification shade and the lock screen, without opening the app.
 
+* Music library: Browse every song on your phone by song, artist, album or genre, and play it without adding it to a playlist first.
+
+* Up Next queue: Play a track next, or add it to the end of the queue, without touching your playlist.
+
+* 10-band equalizer: With presets, a preamp, and separate settings for your speaker, wired headphones, Bluetooth and USB audio.
+
+* Synced lyrics: Read along on the lyrics screen, or have TalkBack read each line as it is sung.
+
+* Voice assistant: Shake your phone twice and tell FukeX what to play.
+
+* Experimental YouTube support: Search YouTube and play a result.
+
+* Android Auto: Browse and play your playlists from the car screen.
+
+* Optional visual icon pack: A polished set of icons for every screen, menu and dialog, downloaded only if you want it.
+
 ## What files can FukeX play?
 
 FukeX plays these file types, both from your device and from an SMB share:
@@ -58,7 +74,13 @@ The first time you open FukeX, it will ask for a few things. Here is what each o
 
 * All files access: FukeX uses its own file picker instead of the system one, because the system picker is painful with a screen reader. To browse your storage that way, Android needs this permission. FukeX explains this in a dialog first, and you can choose "Open settings" to grant it or "Not now" to skip. If you skip it, everything else still works and you can still play from an SMB share.
 
-* Internet: Used only to reach your SMB server. FukeX does not phone home, and there are no ads or trackers.
+* Music and audio access: Lets the music library show the songs on your phone. Say no and the rest of the app still works.
+
+* Microphone: Only used by the voice assistant, and only for the few seconds after you trigger it. FukeX asks for it when it first opens, but you can say no if you never plan to use the assistant.
+
+* Internet: Used to reach your SMB server, to look up lyrics if you allow it, to search YouTube, to download the optional icon pack, and by your phone's speech recognition service for the voice assistant. FukeX does not phone home, and there are no ads or trackers.
+
+* Vibration: A short buzz tells you the voice assistant heard your shake.
 
 ## Creating your first playlist
 
@@ -262,9 +284,119 @@ Some practical notes:
 
 * Your username and password are saved separately from your playlists, once per server. They are never written into a playlist file, so exporting an SMB playlist does not hand your password to anyone you send it to.
 
+## The music library
+
+Tap the Music Library button on the main screen to see every song on your phone, read from Android's own media database. FukeX asks for permission to read your music the first time you open it.
+
+Use the buttons at the top to group the list by Songs, Artists, Albums or Genres, or type in the search field to find a song, artist or album. On a group, "Play all" starts playing it from the top and "Add all to playlist" copies it into a playlist of your choosing.
+
+On a single song, open "Song options" for Play next, Add to queue, and Add to playlist. Playing a song straight from the library never changes any of your playlists.
+
+## Up Next and the queue
+
+Every track on a playlist or in the library has "Play next" and "Add to queue" in its options. "Play next" puts the track right after the one that is playing, and "Add to queue" puts it after everything you already queued.
+
+Queued tracks are never copied into your playlist, and they do not move the saved position of the playlist. Open "Up Next" from the player to see what is coming. It marks the track that is playing as "Now playing" and your additions as "Queued", and you can take a queued track out with "Remove from queue".
+
+## The equalizer
+
+Open the 3-dots menu in the playback bar and choose "Equalizer".
+
+* Enable Equalizer: Turns the equalizer on or off.
+
+* Preset: Flat, Bass Boost, Treble Boost, Vocal, Rock, Pop, Jazz, Classical, Electronic, Hip-Hop, Loudness or Spoken Word. Moving a band yourself switches the preset to Custom.
+
+* Ten bands, from 31 Hz up to 16 kHz, each adjustable by up to 12 dB either way. Swipe up or down on a band to change it, and the slider reads out its frequency and gain.
+
+* Preamp: Lowers or raises the level before the bands, so a big boost does not clip. If a preset sounds distorted, pull the preamp down a few dB.
+
+* Reset to flat: Puts every band back to zero.
+
+* Editing: Each output keeps its own settings, for the phone speaker, wired headphones, Bluetooth, and USB audio. The "Editing" menu picks which one you are changing. FukeX switches to the matching settings by itself when you plug in or connect something, so headphones can sound different from the speaker.
+
+## Lyrics
+
+Open the 3-dots menu and choose "Lyrics". FukeX looks for lyrics in this order: a copy it saved earlier, a .lrc file with the same name sitting next to the song, and finally the lrclib.net website.
+
+The lyrics screen shows the whole song, and "Current line" marks the line being sung when the lyrics are synced. If a song has no lyrics, the screen says so.
+
+Two settings control this, under Lyrics in the settings screen:
+
+* Read Lyrics Aloud: TalkBack reads each synced line as it plays. Off by default, since it talks over your music.
+
+* Find Lyrics Online: When there is no .lrc file, FukeX sends the song's title and artist to lrclib.net to look them up. Turn it off if you would rather nothing leave your phone.
+
+Lyrics that were found are saved on your phone, so each song is looked up only once.
+
+## Adding songs from YouTube (experimental)
+
+In "Add media to playlist", choose the YouTube option, type what you are looking for and press Search. Choose a result to play it. YouTube tracks are streamed, so they need an internet connection, and since this feature is experimental it may stop working whenever YouTube changes something on its side.
+
+## The voice assistant
+
+The voice assistant lets you control FukeX without touching the screen.
+
+To turn it on, open settings, find Voice Assistant, and switch on "Enable Voice Assistant". Allow the microphone permission if you haven't yet. Then:
+
+1. Shake your phone twice. You will feel a short buzz and hear "Listening".
+2. Wait for the beep, then say a command.
+3. FukeX tells you what it is doing, or what it did not understand.
+
+While you talk, the music is turned down so it does not drown you out. Switch on "Work in Background" to use the assistant while FukeX is minimized and something is playing.
+
+Speech recognition is done by your phone's own speech service, which may need an internet connection depending on your device. If the assistant says it is not available, check that a speech recognition app, like Google, is installed and up to date.
+
+What you can say:
+
+* Play something: "Play Shape of You", or "Tum Hi Ho bajao". FukeX looks in your playlists first, then in your music library, and only then on YouTube. If you name an artist or an album, it plays that whole artist or album.
+
+* Play it later: "Play Believer next" or "Add Believer to queue".
+
+* Control playback: "Pause", "Stop", "Resume", "Play", "Next", "Previous", and "Start over" to restart the current track.
+
+* Seek: "Forward", "Rewind", "Forward 30 seconds", "Go back 1 minute". With no number, it moves 10 seconds.
+
+* Volume: "Volume up", "Volume down", "Louder", "Quieter". This changes your phone's media volume.
+
+* Ask what is playing: "What's playing" or "What song is this".
+
+* Amplifier: "Amplifier on", "Amplifier off", "Amplifier increase", "Amplifier decrease".
+
+* Help: "What can I say" lists the commands out loud, and "Open documentation" brings up this page.
+
+A few commands also work in Hindi and Spanish, for example "bajao", "agla", "pichla", "siguiente" and "pausa".
+
+Song names that contain a command word are fine. "Play Back in Black" plays the song instead of going back, because "play" at the start of a sentence always wins.
+
+If the song is in a locked playlist that is not currently unlocked, the assistant tells you so rather than playing it. Unlock the playlist first and ask again. It also will not read out the name of a track from a locked playlist when you ask what is playing.
+
+If the assistant keeps missing you, speak a little slower and closer to the phone, in a quieter place. It tries the several alternatives the recognizer offers, so it forgives a mistake or two.
+
+## Visual icons
+
+FukeX works fully with its standard icons. If you would like a more polished look, it can download an icon pack that restyles the icons on every screen, menu and dialog, and adds small icons beside the headings in settings. The pack is not built into the app. FukeX asks you about it the first time it opens, and downloads it from the FukeX page on GitHub only if you say yes.
+
+You can manage it any time in settings, under Visual Icons:
+
+* Download Visual Icons: Fetches the pack. It is tiny, about 16 KB.
+
+* Use Visual Icons: Switches the pack on or off without deleting it.
+
+* Check for icon updates: Looks for a newer version and installs it.
+
+* Delete icon pack: Removes the pack and goes back to the standard icons.
+
+The pack is checked against a checksum before it is used, and a download that does not match is thrown away. The icons only change how things look. Button names, labels and everything TalkBack announces stay exactly the same with or without the pack.
+
+## Android Auto
+
+FukeX shows up in Android Auto and in other places that browse media, such as Wear OS. You can browse your playlists and pick a track from the car screen. Locked playlists are never shown there, and only trusted apps from Google and the system are allowed to browse your playlists.
+
 ## Controlling playback outside the app
 
 While something is playing, FukeX puts a notification in your shade with previous, play or pause, and next. It also appears on your lock screen, and the same controls work from your car, your smartwatch, and anywhere else Android surfaces media controls.
+
+Playback keeps going while you switch between tabs or open the library, the equalizer or the settings, and after you close the app, until you pause it or close the playlist.
 
 The play, pause and skip buttons on wired and Bluetooth headsets work too, including the double-press for next track that most earbuds use.
 
@@ -358,6 +490,20 @@ In the settings screen, you'll see the following options, grouped under headings
 
 * Enable ReplayGain: Automatically levels out the volume between quiet and loud tracks, using the ReplayGain tag your files already carry if your music library tool wrote one. Off by default.
 
+### Lyrics
+
+* Read Lyrics Aloud and Find Lyrics Online, described in the lyrics section above.
+
+### Visual Icons
+
+* Download, switch on or off, update or delete the optional icon pack, described in the visual icons section above.
+
+### Voice Assistant
+
+* Enable Voice Assistant: Lets you shake your phone twice to give a voice command.
+
+* Work in Background: Also listens for the shake while FukeX is minimized and something is playing. This only watches the motion sensor, the microphone stays off until you shake.
+
 ### Fading (Gapless Playback)
 
 * Event selector, plus the Fade In and Fade Out sliders described in the fading section above.
@@ -365,6 +511,8 @@ In the settings screen, you'll see the following options, grouped under headings
 ### About
 
 * About FukeX: Version number, copyright and license information.
+
+* Documentation and License: Open this page and the license from inside the app.
 
 ## Where your data is kept
 
@@ -376,11 +524,13 @@ Everything FukeX knows about you sits on your phone, in the app's own private st
 
 * Your SMB logins live in a separate private file of their own, one entry per server.
 
-* Your settings live in FukeX's private preferences.
+* Your settings, and your equalizer settings for each output, live in FukeX's private preferences.
+
+* Lyrics that were found are saved in the app's cache folder.
 
 * Streamed SMB audio is cached in the app's cache folder, up to 500 MB. Local files are never cached, since they are already on your phone. Clearing the app's cache in Android settings empties it.
 
-FukeX never sends any of this anywhere. Your playlists and your SMB logins are also kept out of Android's automatic cloud backup, so they don't quietly end up in your Google account. Uninstalling FukeX removes the lot. If you want a backup of your playlists, use the export feature.
+FukeX never sends any of this anywhere. The only things that leave your phone are the ones you asked for: SMB traffic to your own server, a lyrics lookup to lrclib.net if "Find Lyrics Online" is on, downloading the optional icon pack from GitHub, YouTube searches and streams, and whatever your phone's speech service does with your voice when you use the assistant. Your playlists and your SMB logins are also kept out of Android's automatic cloud backup, so they don't quietly end up in your Google account. Uninstalling FukeX removes the lot. If you want a backup of your playlists, use the export feature.
 
 ## Tips and troubleshooting
 
@@ -398,6 +548,16 @@ FukeX never sends any of this anywhere. Your playlists and your SMB logins are a
 
 * Playback pauses on its own. Check whether something else grabbed the audio, like a call or another player. This is deliberate, and FukeX resumes by itself after a call.
 
+* The voice assistant does not respond to a shake. Check that "Enable Voice Assistant" is on and that the microphone permission was granted. Give the phone two firm shakes within a couple of seconds. Outside the app, "Work in Background" must be on and something must be playing.
+
+* The voice assistant plays the wrong song. Say the full title, or add the artist's name. It plays the first match, looking through playlists first and then the music library.
+
+* The music library is empty. FukeX needs the music and audio permission, and the songs must be marked as music by Android. Ringtones and recordings are left out.
+
+* The icons did not change after downloading the pack. Check that "Use Visual Icons" is on in settings. If the download failed, try again on a stronger connection.
+
+* The equalizer sounds distorted. Lower the preamp, or lower the bands you boosted.
+
 * An imported SMB playlist won't play. Connect to that server once through "Add media to playlist", so FukeX learns the login for it.
 
 ## Accessibility quick reference
@@ -409,6 +569,10 @@ On a playlist tab: Create new playlist, Move Left, Move Right, Hide or Unlock, E
 On a track in the list: Move Up, Move Down, Remove.
 
 On the More options button: Search within playlist, Playlist info, Enable or Disable Amplifier, Playback Effects, Hide or Unlock, Remove.
+
+On a song in the music library: Play next, Add to queue, Add to playlist.
+
+On a queued track in Up Next: Remove from queue.
 
 On a folder in the file picker or SMB picker: Add entire folder.
 

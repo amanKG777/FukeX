@@ -1,4 +1,6 @@
 package com.boostofstudios.fukex
+
+import com.boostofstudios.fukex.ui.FxIcons
 import android.net.Uri
 import android.os.Environment
 import androidx.activity.compose.BackHandler
@@ -6,10 +8,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AudioFile
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -57,7 +55,7 @@ fun FilePickerScreen(
 				navigationIcon = {
 					if (currentDir.absolutePath != root.absolutePath) {
 						IconButton(onClick = { currentDir = currentDir.parentFile ?: root }) {
-							Icon(Icons.Default.Folder, contentDescription = "Go up to parent folder")
+							Icon(FxIcons.Folder, contentDescription = "Go up to parent folder")
 						}
 					}
 				},
@@ -87,9 +85,9 @@ fun FilePickerScreen(
 						leadingContent = {
 							Icon(
 								when {
-									isDir -> Icons.Default.Folder
-									isMedia -> Icons.Default.AudioFile
-									else -> Icons.Default.InsertDriveFile
+									isDir -> FxIcons.Folder
+									isMedia -> FxIcons.AudioFile
+									else -> FxIcons.InsertDriveFile
 								},
 								contentDescription = if (isDir) "Folder" else "File"
 							)

@@ -1,0 +1,14 @@
+{
+  "format": 1,
+  "packs": [
+    {
+      "id": "visual-icons",
+      "name": "Visual Icons",
+      "version": 1,
+      "description": "Crisp rounded duotone icons for every screen, menu and dialog. Follows your theme colours.",
+      "file": "visual-icons.fxicons",
+      "sha256": "e00118d2fe9a1154fbaa1c2391f95009de6f5e74b460370851d5adc00a08a16a",
+      "sizeBytes": 15938
+    }
+  ]
+}

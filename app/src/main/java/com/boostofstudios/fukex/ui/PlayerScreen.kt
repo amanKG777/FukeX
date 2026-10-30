@@ -9,24 +9,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.QueueMusic
-import androidx.compose.material.icons.automirrored.filled.VolumeOff
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.AudioFile
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Equalizer
-import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.LockOpen
-import androidx.compose.material.icons.filled.Lyrics
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -84,7 +66,7 @@ internal fun OverflowMenu(description: String, actions: List<MenuAction>) {
 				}
 			}
 		) {
-			Icon(Icons.Default.MoreVert, contentDescription = null)
+			Icon(FxIcons.MoreVert, contentDescription = null)
 		}
 		DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
 			actions.forEach { action ->
@@ -139,11 +121,11 @@ fun PlayerScreen(
 				val uri = playlist.uris[index]
 				val isSelected = index == playingIndex
 				val trackActions = buildList {
-					add(MenuAction("Play next", Icons.AutoMirrored.Filled.QueueMusic) { engine.playNext(uri) })
-					add(MenuAction("Add to queue", Icons.AutoMirrored.Filled.QueueMusic) { engine.addToQueue(uri) })
-					if (index > 0) add(MenuAction("Move Up", Icons.Default.AudioFile) { swap(index, index - 1) })
-					if (index < playlist.uris.size - 1) add(MenuAction("Move Down", Icons.Default.AudioFile) { swap(index, index + 1) })
-					add(MenuAction("Remove", Icons.Default.Delete) { removeTrack(index) })
+					add(MenuAction("Play next", FxIcons.QueueMusic) { engine.playNext(uri) })
+					add(MenuAction("Add to queue", FxIcons.QueueMusic) { engine.addToQueue(uri) })
+					if (index > 0) add(MenuAction("Move Up", FxIcons.AudioFile) { swap(index, index - 1) })
+					if (index < playlist.uris.size - 1) add(MenuAction("Move Down", FxIcons.AudioFile) { swap(index, index + 1) })
+					add(MenuAction("Remove", FxIcons.Delete) { removeTrack(index) })
 				}
 				ListItem(
 					headlineContent = {
@@ -154,9 +136,9 @@ fun PlayerScreen(
 					},
 					leadingContent = {
 						if (isSelected) {
-							Icon(Icons.Default.PlayArrow, contentDescription = "Playing", tint = MaterialTheme.colorScheme.primary)
+							Icon(FxIcons.PlayArrow, contentDescription = "Playing", tint = MaterialTheme.colorScheme.primary)
 						} else {
-							Icon(Icons.Default.AudioFile, contentDescription = null)
+							Icon(FxIcons.AudioFile, contentDescription = null)
 						}
 					},
 					trailingContent = {
@@ -183,20 +165,20 @@ fun PlayerScreen(
 			engine = engine,
 			hideDetails = hidePlayingDetails,
 			moreActions = buildList {
-				add(MenuAction("Search within playlist", Icons.Default.Search) { showSearchDialog = true })
-				add(MenuAction("Playlist info", Icons.Default.Info) { showInfoDialog = true })
-				add(MenuAction("Up next", Icons.AutoMirrored.Filled.QueueMusic) { showQueueDialog = true })
-				add(MenuAction("Lyrics", Icons.Default.Lyrics, onOpenLyrics))
-				add(MenuAction("Equalizer", Icons.Default.Equalizer, onOpenEqualizer))
+				add(MenuAction("Search within playlist", FxIcons.Search) { showSearchDialog = true })
+				add(MenuAction("Playlist info", FxIcons.Info) { showInfoDialog = true })
+				add(MenuAction("Up next", FxIcons.QueueMusic) { showQueueDialog = true })
+				add(MenuAction("Lyrics", FxIcons.Lyrics, onOpenLyrics))
+				add(MenuAction("Equalizer", FxIcons.Equalizer, onOpenEqualizer))
 				add(amplifierAction())
-				add(MenuAction("Playback Effects", Icons.Default.GraphicEq) { showEffectsDialog = true })
+				add(MenuAction("Playback Effects", FxIcons.GraphicEq) { showEffectsDialog = true })
 				if (canModifyPlaylist) {
 					add(MenuAction(
 						if (playlist.isHidden) "Unlock Playlist" else "Hide Playlist",
-						if (playlist.isHidden) Icons.Default.LockOpen else Icons.Default.Lock,
+						if (playlist.isHidden) FxIcons.LockOpen else FxIcons.Lock,
 						onHide
 					))
-					add(MenuAction("Remove Playlist", Icons.Default.Delete, onRemove))
+					add(MenuAction("Remove Playlist", FxIcons.Delete, onRemove))
 				}
 			}
 		)
@@ -232,7 +214,7 @@ private fun amplifierAction(): MenuAction {
 	}
 	return MenuAction(
 		if (enabled) "Disable Amplifier" else "Enable Amplifier (Boost ${level / 100}dB)",
-		if (enabled) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff
+		if (enabled) FxIcons.VolumeUp else FxIcons.VolumeOff
 	) {
 		SettingsManager.setAmplifierEnabled(context, !enabled)
 	}
@@ -300,7 +282,7 @@ private fun NowPlayingBar(
 				verticalAlignment = Alignment.CenterVertically
 			) {
 				IconButton(onClick = { engine.previous() }, enabled = state.currentIndex > 0) {
-					Icon(Icons.Default.SkipPrevious, contentDescription = "Previous")
+					Icon(FxIcons.SkipPrevious, contentDescription = "Previous")
 				}
 				IconButton(onClick = {
 					if (hasQueue) {
@@ -311,12 +293,12 @@ private fun NowPlayingBar(
 					}
 				}) {
 					Icon(
-						if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+						if (state.isPlaying) FxIcons.Pause else FxIcons.PlayArrow,
 						contentDescription = if (state.isPlaying) "Pause" else "Play"
 					)
 				}
 				IconButton(onClick = { engine.next() }, enabled = hasQueue && state.currentIndex < state.queue.lastIndex) {
-					Icon(Icons.Default.SkipNext, contentDescription = "Next")
+					Icon(FxIcons.SkipNext, contentDescription = "Next")
 				}
 				OverflowMenu("More Options", moreActions)
 			}

@@ -9,10 +9,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -224,12 +220,12 @@ fun QueueDialog(engine: PlaybackEngine, hideTitles: Boolean, onDismiss: () -> Un
 								else -> null
 							},
 							leadingContent = {
-								Icon(if (isCurrent) Icons.Default.PlayArrow else Icons.Default.QueueMusic, contentDescription = null)
+								Icon(if (isCurrent) FxIcons.PlayArrow else FxIcons.QueueMusic, contentDescription = null)
 							},
 							trailingContent = {
 								if (!isCurrent) {
 									IconButton(onClick = { engine.removeFromQueue(i) }, modifier = Modifier.clearAndSetSemantics { }) {
-										Icon(Icons.Default.Close, contentDescription = null)
+										Icon(FxIcons.Close, contentDescription = null)
 									}
 								}
 							},
