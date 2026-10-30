@@ -23,8 +23,21 @@
 -dontwarn org.slf4j.**
 -keep class org.slf4j.** { *; }
 
+# jcifs-ng (SMB) gets its crypto from BouncyCastle. The provider loads its algorithms by class name,
+# so those packages must stay, but the rest of BouncyCastle (post-quantum, x509, ...) can be shrunk.
 -dontwarn org.bouncycastle.**
--keep class org.bouncycastle.** { *; }
+-keep class org.bouncycastle.jcajce.provider.** { *; }
+-keep class org.bouncycastle.jce.provider.** { *; }
 
 -dontwarn jcifs.**
 -keep class jcifs.** { *; }
+
+# NewPipe Extractor (YouTube): Rhino references desktop-only classes and builds scripts by reflection,
+# and the extractor loads its time-ago patterns and protobuf messages by name.
+-dontwarn java.beans.**
+-dontwarn javax.script.**
+-dontwarn org.mozilla.javascript.**
+-keep class org.mozilla.javascript.** { *; }
+-keep class org.mozilla.classfile.ClassFileWriter
+-keep class org.schabi.newpipe.extractor.timeago.patterns.** { *; }
+-keepclassmembers class * extends com.google.protobuf.GeneratedMessageLite { <fields>; }

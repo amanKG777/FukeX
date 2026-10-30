@@ -74,6 +74,28 @@ android {
     kotlinOptions {
         jvmTarget = "11"
     }
+    // The app's own text is English; the voice assistant also understands Hindi and Spanish
+    androidResources {
+        localeFilters += listOf("en", "hi", "es")
+    }
+    packaging {
+        resources {
+            excludes += listOf(
+                "/META-INF/{AL2.0,LGPL2.1}",
+                "/META-INF/*.version",
+                "/META-INF/LICENSE*", "/META-INF/NOTICE*", "/META-INF/DEPENDENCIES",
+                "/META-INF/versions/**",
+                "DebugProbesKt.bin",
+                "kotlin/**", "**/*.kotlin_builtins", "**/*.kotlin_metadata",
+                "**/*.proto",
+                // Unused post-quantum parameter tables and translated messages from libraries
+                "org/bouncycastle/pqc/**/*.properties",
+                "org/bouncycastle/**/CertPathReviewerMessages*",
+                "org/bouncycastle/**/LocalizedMessages*",
+                "org/mozilla/javascript/resources/Messages_*.properties"
+            )
+        }
+    }
     buildFeatures {
         compose = true
         buildConfig = true
