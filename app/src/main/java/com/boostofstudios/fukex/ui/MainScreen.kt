@@ -68,6 +68,8 @@ import com.boostofstudios.fukex.data.Playlist
 import com.boostofstudios.fukex.data.PlaylistManager
 import com.boostofstudios.fukex.data.PlaylistSecurity
 import com.boostofstudios.fukex.data.SettingsManager
+import com.boostofstudios.fukex.data.UpdateManager
+import com.boostofstudios.fukex.data.UpdateState
 import com.boostofstudios.fukex.playback.PlaybackEngine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -99,21 +101,6 @@ fun MainScreen(modifier: Modifier = Modifier) {
 	MainScreenContent(initialPlaylists, modifier)
 }
 
-private fun checkForUpdate(): String? = try {
-	val connection = java.net.URL("https://api.github.com/repos/amankg777/fukex/releases/latest").openConnection() as java.net.HttpURLConnection
-	connection.requestMethod = "GET"
-	connection.setRequestProperty("Accept", "application/vnd.github.v3+json")
-	connection.connectTimeout = 5000
-	if (connection.responseCode == 200) {
-		val json = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
-		val tagName = json.optString("tag_name", "").removePrefix("v")
-		val htmlUrl = json.optString("html_url", "https://github.com/amankg777/fukex/releases/latest")
-		if (tagName.isNotEmpty() && tagName != BuildConfig.VERSION_NAME) htmlUrl else null
-	} else null
-} catch (e: Exception) {
-	null
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MainScreenContent(initialPlaylists: List<Playlist>, modifier: Modifier = Modifier) {
@@ -143,7 +130,7 @@ private fun MainScreenContent(initialPlaylists: List<Playlist>, modifier: Modifi
 	var showLyrics by remember { mutableStateOf(false) }
 	var showExitDialog by remember { mutableStateOf(false) }
 	var showStorageRationale by remember { mutableStateOf(false) }
-	var updateUrl by remember { mutableStateOf<String?>(null) }
+	val updateState by UpdateManager.state.collectAsState()
 	var showIconPackPrompt by remember { mutableStateOf(!SettingsManager.isIconPackPromptDone(context)) }
 	val openDocs by VoicePlayRequests.openDocs.collectAsState()
 
@@ -234,7 +221,7 @@ private fun MainScreenContent(initialPlaylists: List<Playlist>, modifier: Modifi
 		}
 	}
 	LaunchedEffect(Unit) {
-		updateUrl = withContext(Dispatchers.IO) { checkForUpdate() }
+		UpdateManager.check(manual = false)
 	}
 	LaunchedEffect(Unit) {
 		while (true) {
@@ -444,17 +431,9 @@ private fun MainScreenContent(initialPlaylists: List<Playlist>, modifier: Modifi
 		if (showExitDialog) {
 			ExitDialog(onConfirm = { (context as? MainActivity)?.finish() }, onDismiss = { showExitDialog = false })
 		}
-		updateUrl?.let { url ->
-			UpdateAvailableDialog(
-				onUpdate = {
-					updateUrl = null
-					context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-				},
-				onDismiss = { updateUrl = null }
-			)
-		}
+		UpdateDialogs()
 		// Asked once, and only after the more important first-run dialogs are out of the way
-		if (showIconPackPrompt && !showStorageRationale && updateUrl == null) {
+		if (showIconPackPrompt && !showStorageRationale && updateState is UpdateState.Idle) {
 			IconPackPrompt(onFinished = {
 				SettingsManager.setIconPackPromptDone(context, true)
 				showIconPackPrompt = false

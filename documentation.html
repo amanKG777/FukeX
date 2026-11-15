@@ -62,6 +62,31 @@ picker already hides everything that isn’t playable.</p>
 <h2 id="how-to-get-it">How to get it?</h2>
 <p>You can download FukeX to your device from our website:</p>
 <p>Click here to download FukeX</p>
+<h2 id="updating-fukex">Updating FukeX</h2>
+<p>Each time FukeX opens it quietly checks GitHub for a newer release.
+You can also check yourself any time: open settings, scroll to About,
+and choose “Check for updates”.</p>
+<p>When a newer version exists, FukeX tells you what is new and asks
+“Update now?”. If you say yes:</p>
+<ol type="1">
+<li>FukeX downloads the update and shows the progress. It then checks
+that the file is complete, that it really is FukeX, that it is newer
+than your version, and that it is signed by the same key as the FukeX
+you have.</li>
+<li>The first time, Android needs your permission for FukeX to install
+apps. FukeX explains this and opens the right Android page. Switch on
+“Allow from this source”, then press back to return to FukeX.</li>
+<li>Android’s own installer opens and asks if you want to update FukeX.
+Confirm, and it installs over the old version. Your playlists, settings
+and saved positions are kept.</li>
+</ol>
+<p>Versions are compared as numbers, so 0.10.0 counts as newer than
+0.9.0, and a pre-release such as 1.0.0-rc.1 counts as older than 1.0.0.
+If the update is not newer, or is signed with a different key, FukeX
+tells you and does not install it.</p>
+<p>If you would rather not update from inside the app, you can still
+download the APK from the release page and install it yourself, as
+described below.</p>
 <h2 id="installing-the-apk-file">Installing the APK file</h2>
 <p>Once you obtain the APK file, here is how you install it:</p>
 <ol type="1">
@@ -106,6 +131,9 @@ but you can say no if you never plan to use the assistant.</p></li>
 allow it, to search YouTube, to download the optional icon pack, and by
 your phone’s speech recognition service for the voice assistant. FukeX
 does not phone home, and there are no ads or trackers.</p></li>
+<li><p>Install unknown apps: Only asked for when you update FukeX from
+inside the app, and only the first time. See the updating
+section.</p></li>
 <li><p>Vibration: A short buzz tells you the voice assistant heard your
 shake.</p></li>
 </ul>
@@ -680,6 +708,8 @@ the fading section above.</li>
 <ul>
 <li><p>About FukeX: Version number, copyright and license
 information.</p></li>
+<li><p>Check for updates: Looks for a newer FukeX on GitHub and installs
+it if you agree.</p></li>
 <li><p>Documentation and License: Open this page and the license from
 inside the app.</p></li>
 </ul>
@@ -742,6 +772,10 @@ playlists first and then the music library.</p></li>
 <li><p>The music library is empty. FukeX needs the music and audio
 permission, and the songs must be marked as music by Android. Ringtones
 and recordings are left out.</p></li>
+<li><p>Updating from inside FukeX says the update is signed with a
+different key. You installed FukeX from a build made with another key,
+such as a test build. Android never updates an app across keys. Export
+your playlists, uninstall FukeX, and install the release APK.</p></li>
 <li><p>The icons did not change after downloading the pack. Check that
 “Use Visual Icons” is on in settings. If the download failed, try again
 on a stronger connection.</p></li>

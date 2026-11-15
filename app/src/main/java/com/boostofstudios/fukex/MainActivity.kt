@@ -22,6 +22,8 @@ class MainActivity : FragmentActivity() {
 	private val prefsListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
 		if (key == "voice_assistant_enabled") {
 			updateForegroundShakeDetector()
+		} else if (key == "voice_assistant_tts_engine") {
+			voiceAssistantManager?.reloadTtsEngine()
 		}
 	}
 

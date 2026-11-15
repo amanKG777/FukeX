@@ -16,8 +16,29 @@ import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import androidx.core.content.ContextCompat
+import com.boostofstudios.fukex.data.SettingsManager
 import java.util.Locale
 import kotlinx.coroutines.flow.MutableStateFlow
+
+data class TtsEngineInfo(
+    val packageName: String?,
+    val label: String
+)
+
+fun getInstalledTtsEngines(context: Context): List<TtsEngineInfo> {
+    val list = mutableListOf(TtsEngineInfo(null, "System Default"))
+    try {
+        val pm = context.packageManager
+        val intent = Intent("android.intent.action.TTS_SERVICE")
+        val services = pm.queryIntentServices(intent, PackageManager.MATCH_ALL)
+        for (resolveInfo in services) {
+            val pkg = resolveInfo.serviceInfo?.packageName ?: continue
+            val label = resolveInfo.serviceInfo.loadLabel(pm)?.toString() ?: pkg
+            list.add(TtsEngineInfo(pkg, label))
+        }
+    } catch (e: Exception) {}
+    return list
+}
 
 // The voice assistant plays through PlaybackEngine directly; this only asks the UI
 // to show the playlist it played from, and tells the assistant which locked playlists are open.
@@ -52,6 +73,7 @@ class VoiceAssistantManager(
     private var ttsReady = false
     private var speechRecognizer: SpeechRecognizer? = null
     private var isListening = false
+    private var retryAttempt = 0
     private var focusRequest: AudioFocusRequest? = null
     private val watchdog = Runnable {
         if (isListening) {
@@ -62,7 +84,20 @@ class VoiceAssistantManager(
     }
 
     init {
-        tts = TextToSpeech(context) { status ->
+        initTts()
+    }
+
+    fun reloadTtsEngine() {
+        tts?.stop()
+        tts?.shutdown()
+        tts = null
+        ttsReady = false
+        initTts()
+    }
+
+    private fun initTts() {
+        val enginePackage = SettingsManager.getVoiceAssistantTtsEngine(context)
+        val onInit = TextToSpeech.OnInitListener { status ->
             if (status == TextToSpeech.SUCCESS) {
                 val res = tts?.setLanguage(Locale.getDefault())
                 if (res == TextToSpeech.LANG_MISSING_DATA || res == TextToSpeech.LANG_NOT_SUPPORTED) {
@@ -76,6 +111,11 @@ class VoiceAssistantManager(
                 )
                 ttsReady = true
             }
+        }
+        tts = if (!enginePackage.isNullOrBlank()) {
+            TextToSpeech(context, onInit, enginePackage)
+        } else {
+            TextToSpeech(context, onInit)
         }
     }
 
@@ -110,23 +150,46 @@ class VoiceAssistantManager(
             return
         }
         isListening = true
+        retryAttempt = 0
         mainHandler.postDelayed(watchdog, LISTEN_WATCHDOG_MS)
         // Quiet the music so it doesn't drown out the user, and so the prompt is heard
         requestDuckFocus()
-        speak("Listening") { if (isListening) listenInternal() }
+        speak("Listening") {
+            if (isListening) {
+                // Short 120ms pause after TTS completes to ensure audio track release before mic opens
+                mainHandler.postDelayed({ if (isListening) listenInternal() }, 120)
+            }
+        }
+    }
+
+    private fun obtainRecognizer(): SpeechRecognizer {
+        speechRecognizer?.let { return it }
+        val recognizer = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU &&
+            SpeechRecognizer.isOnDeviceRecognitionAvailable(context)) {
+            try {
+                SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+            } catch (e: Exception) {
+                SpeechRecognizer.createSpeechRecognizer(context)
+            }
+        } else {
+            SpeechRecognizer.createSpeechRecognizer(context)
+        }
+        speechRecognizer = recognizer
+        return recognizer
     }
 
     private fun listenInternal() {
-        // A recognizer that errored out can be left in a bad state, so each session gets a fresh one
-        speechRecognizer?.destroy()
-        val recognizer = SpeechRecognizer.createSpeechRecognizer(context)
-        speechRecognizer = recognizer
+        val recognizer = obtainRecognizer()
+        try {
+            recognizer.cancel()
+        } catch (e: Exception) {}
 
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, MAX_ALTERNATIVES)
             putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
+            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
         }
 
         recognizer.setRecognitionListener(object : RecognitionListener {
@@ -136,6 +199,22 @@ class VoiceAssistantManager(
             override fun onBufferReceived(buffer: ByteArray?) {}
             override fun onEndOfSpeech() {}
             override fun onError(error: Int) {
+                // Auto-retry once on busy or cold-start server/client glitches
+                if (retryAttempt == 0 && (error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY ||
+                        error == SpeechRecognizer.ERROR_SERVER ||
+                        error == SpeechRecognizer.ERROR_CLIENT)) {
+                    retryAttempt++
+                    try { speechRecognizer?.cancel() } catch (e: Exception) {}
+                    try { speechRecognizer?.destroy() } catch (e: Exception) {}
+                    speechRecognizer = null
+                    mainHandler.postDelayed({
+                        if (isListening) {
+                            listenInternal()
+                        }
+                    }, 300)
+                    return
+                }
+
                 finishListening()
                 speak(
                     when (error) {
@@ -166,7 +245,13 @@ class VoiceAssistantManager(
             override fun onPartialResults(partialResults: Bundle?) {}
             override fun onEvent(eventType: Int, params: Bundle?) {}
         })
-        recognizer.startListening(intent)
+
+        try {
+            recognizer.startListening(intent)
+        } catch (e: Exception) {
+            finishListening()
+            speak("Could not start speech recognition.")
+        }
     }
 
     private fun finishListening() {

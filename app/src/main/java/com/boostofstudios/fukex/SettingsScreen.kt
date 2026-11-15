@@ -3,9 +3,12 @@ package com.boostofstudios.fukex
 import com.boostofstudios.fukex.ui.FxIcons
 import com.boostofstudios.fukex.ui.IconPackSettingsItems
 import com.boostofstudios.fukex.data.IconPackManager
+import com.boostofstudios.fukex.data.UpdateManager
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.*
@@ -47,6 +50,8 @@ fun SettingsScreen(
 	var isExitPromptEnabled by remember { mutableStateOf(SettingsManager.isExitPromptEnabled(context)) }
 	var lockTimeout by remember { mutableStateOf(SettingsManager.getLockTimeout(context)) }
 	var showTimeoutDialog by remember { mutableStateOf(false) }
+	var ttsEngine by remember { mutableStateOf(SettingsManager.getVoiceAssistantTtsEngine(context)) }
+	var showTtsDialog by remember { mutableStateOf(false) }
 	var showAboutScreen by remember { mutableStateOf(false) }
 	var amplifierLevel by remember { mutableIntStateOf(SettingsManager.getAmplifierLevel(context)) }
 	var showAmplifierWarning by remember { mutableStateOf(false) }
@@ -265,6 +270,9 @@ fun SettingsScreen(
 					}
 				)
 				if (isVoiceAssistantEnabled) {
+					val installedTtsEngines = remember { getInstalledTtsEngines(context) }
+					val currentEngineLabel = installedTtsEngines.firstOrNull { it.packageName == ttsEngine }?.label ?: "System Default"
+
 					SettingsToggleItem(
 						title = "Work in Background",
 						subtitle = "Trigger assistant even when app is minimized (during playback)",
@@ -274,6 +282,17 @@ fun SettingsScreen(
 							SettingsManager.setVoiceAssistantBackgroundEnabled(context, it)
 							isVoiceAssistantBackgroundEnabled = it 
 						}
+					)
+					ListItem(
+						headlineContent = { Text("Assistant Voice") },
+						supportingContent = { Text(currentEngineLabel) },
+						leadingContent = { Icon(FxIcons.SettingsVoice, null) },
+						modifier = Modifier
+							.clickable { showTtsDialog = true }
+							.semantics {
+								role = Role.Button
+								stateDescription = currentEngineLabel
+							}
 					)
 				}
 			}
@@ -368,6 +387,12 @@ fun SettingsScreen(
 			item {
 				SettingsHeader("About")
 				ListItem(
+					headlineContent = { Text("Check for updates") },
+					supportingContent = { Text("You have version ${BuildConfig.VERSION_NAME}. Looks on GitHub for a newer one and installs it if you agree") },
+					leadingContent = { Icon(FxIcons.FileDownload, null) },
+					modifier = Modifier.clickable { UpdateManager.check(manual = true) }
+				)
+				ListItem(
 					headlineContent = { Text("About FukeX") },
 					supportingContent = { Text("Version ${BuildConfig.VERSION_NAME}, Copyright info, and license") },
 					leadingContent = { Icon(FxIcons.Info, null) },
@@ -421,6 +446,42 @@ fun SettingsScreen(
 			},
 			dismissButton = {
 				TextButton(onClick = { showAmplifierWarning = false }) { Text("Cancel") }
+			}
+		)
+	}
+	if (showTtsDialog) {
+		val installedTtsEngines = remember { getInstalledTtsEngines(context) }
+		AlertDialog(
+			onDismissRequest = { showTtsDialog = false },
+			title = { Text("Select Voice Assistant Voice") },
+			text = {
+				Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+					installedTtsEngines.forEach { engineItem ->
+						val isSelected = ttsEngine == engineItem.packageName
+						Row(
+							modifier = Modifier
+								.fillMaxWidth()
+								.clickable {
+									SettingsManager.setVoiceAssistantTtsEngine(context, engineItem.packageName)
+									ttsEngine = engineItem.packageName
+									showTtsDialog = false
+								}
+								.padding(16.dp)
+								.semantics {
+									stateDescription = if (isSelected) "Selected" else "Not selected"
+									role = Role.RadioButton
+								},
+							verticalAlignment = Alignment.CenterVertically
+						) {
+							RadioButton(selected = isSelected, onClick = null)
+							Spacer(Modifier.width(8.dp))
+							Text(engineItem.label)
+						}
+					}
+				}
+			},
+			confirmButton = {
+				TextButton(onClick = { showTtsDialog = false }) { Text("Cancel") }
 			}
 		)
 	}

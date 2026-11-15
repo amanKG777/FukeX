@@ -15,6 +15,7 @@ object SettingsManager {
     private const val KEY_BACKGROUND_PLAYBACK = "background_playback"
     private const val KEY_VOICE_ASSISTANT_ENABLED = "voice_assistant_enabled"
     private const val KEY_VOICE_ASSISTANT_BACKGROUND = "voice_assistant_background"
+    private const val KEY_VOICE_ASSISTANT_TTS_ENGINE = "voice_assistant_tts_engine"
     private const val KEY_LOCK_TIMEOUT = "lock_timeout"
     private const val KEY_AMPLIFIER_LEVEL = "amplifier_level"
     private const val KEY_AMPLIFIER_ENABLED = "amplifier_enabled"
@@ -177,6 +178,14 @@ object SettingsManager {
 
     fun setVoiceAssistantBackgroundEnabled(context: Context, enabled: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_VOICE_ASSISTANT_BACKGROUND, enabled).apply()
+    }
+
+    fun getVoiceAssistantTtsEngine(context: Context): String? {
+        return getPrefs(context).getString(KEY_VOICE_ASSISTANT_TTS_ENGINE, null)
+    }
+
+    fun setVoiceAssistantTtsEngine(context: Context, enginePackage: String?) {
+        getPrefs(context).edit().putString(KEY_VOICE_ASSISTANT_TTS_ENGINE, enginePackage).apply()
     }
 
     // Off by default: TalkBack only reads lyric lines when the user opts in

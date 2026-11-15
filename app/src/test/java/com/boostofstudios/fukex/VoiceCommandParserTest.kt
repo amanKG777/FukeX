@@ -89,6 +89,23 @@ class VoiceCommandParserTest {
 	}
 
 	@Test
+	fun resultAndVersionCommands() {
+		assertEquals(NextResult, parse("next result"))
+		assertEquals(NextResult, parse("play next result"))
+		assertEquals(NextResult, parse("next version"))
+		assertEquals(NextResult, parse("another version"))
+		assertEquals(NextResult, parse("different one"))
+		assertEquals(NextResult, parse("dusra bajao"))
+		assertEquals(NextResult, parse("dusra wala"))
+		assertEquals(PreviousResult, parse("previous result"))
+		assertEquals(PreviousResult, parse("pichla result"))
+		assertEquals(SelectResult(2), parse("result 2"))
+		assertEquals(SelectResult(3), parse("play option 3"))
+		assertEquals(SelectResult(2), parse("second result"))
+		assertEquals(SelectResult(3), parse("teesra option"))
+	}
+
+	@Test
 	fun unknownSpeechIsNotACommand() {
 		assertNull(parse("the weather is nice"))
 		assertNull(parse(""))

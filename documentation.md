@@ -54,6 +54,20 @@ You can download FukeX to your device from our website:
 
 Click here to download FukeX
 
+## Updating FukeX
+
+Each time FukeX opens it quietly checks GitHub for a newer release. You can also check yourself any time: open settings, scroll to About, and choose "Check for updates".
+
+When a newer version exists, FukeX tells you what is new and asks "Update now?". If you say yes:
+
+1. FukeX downloads the update and shows the progress. It then checks that the file is complete, that it really is FukeX, that it is newer than your version, and that it is signed by the same key as the FukeX you have.
+2. The first time, Android needs your permission for FukeX to install apps. FukeX explains this and opens the right Android page. Switch on "Allow from this source", then press back to return to FukeX.
+3. Android's own installer opens and asks if you want to update FukeX. Confirm, and it installs over the old version. Your playlists, settings and saved positions are kept.
+
+Versions are compared as numbers, so 0.10.0 counts as newer than 0.9.0, and a pre-release such as 1.0.0-rc.1 counts as older than 1.0.0. If the update is not newer, or is signed with a different key, FukeX tells you and does not install it.
+
+If you would rather not update from inside the app, you can still download the APK from the release page and install it yourself, as described below.
+
 ## Installing the APK file
 
 Once you obtain the APK file, here is how you install it:
@@ -79,6 +93,8 @@ The first time you open FukeX, it will ask for a few things. Here is what each o
 * Microphone: Only used by the voice assistant, and only for the few seconds after you trigger it. FukeX asks for it when it first opens, but you can say no if you never plan to use the assistant.
 
 * Internet: Used to reach your SMB server, to look up lyrics if you allow it, to search YouTube, to download the optional icon pack, and by your phone's speech recognition service for the voice assistant. FukeX does not phone home, and there are no ads or trackers.
+
+* Install unknown apps: Only asked for when you update FukeX from inside the app, and only the first time. See the updating section.
 
 * Vibration: A short buzz tells you the voice assistant heard your shake.
 
@@ -350,6 +366,8 @@ What you can say:
 
 * Play something: "Play Shape of You", or "Tum Hi Ho bajao". FukeX looks in your playlists first, then in your music library, and only then on YouTube. If you name an artist or an album, it plays that whole artist or album.
 
+* Switch results or versions: If multiple versions of a song exist in a playlist, or when searching on YouTube, say "Next result", "Another version", "Different one", "Dusra bajao", or "Option 2" to cycle through them without having to search again.
+
 * Play it later: "Play Believer next" or "Add Believer to queue".
 
 * Control playback: "Pause", "Stop", "Resume", "Play", "Next", "Previous", and "Start over" to restart the current track.
@@ -504,6 +522,8 @@ In the settings screen, you'll see the following options, grouped under headings
 
 * Work in Background: Also listens for the shake while FukeX is minimized and something is playing. This only watches the motion sensor, the microphone stays off until you shake.
 
+* Assistant Voice: Choose which installed Text-to-Speech (TTS) engine on your device speaks the voice assistant responses.
+
 ### Fading (Gapless Playback)
 
 * Event selector, plus the Fade In and Fade Out sliders described in the fading section above.
@@ -511,6 +531,8 @@ In the settings screen, you'll see the following options, grouped under headings
 ### About
 
 * About FukeX: Version number, copyright and license information.
+
+* Check for updates: Looks for a newer FukeX on GitHub and installs it if you agree.
 
 * Documentation and License: Open this page and the license from inside the app.
 
@@ -553,6 +575,8 @@ FukeX never sends any of this anywhere. The only things that leave your phone ar
 * The voice assistant plays the wrong song. Say the full title, or add the artist's name. It plays the first match, looking through playlists first and then the music library.
 
 * The music library is empty. FukeX needs the music and audio permission, and the songs must be marked as music by Android. Ringtones and recordings are left out.
+
+* Updating from inside FukeX says the update is signed with a different key. You installed FukeX from a build made with another key, such as a test build. Android never updates an app across keys. Export your playlists, uninstall FukeX, and install the release APK.
 
 * The icons did not change after downloading the pack. Check that "Use Visual Icons" is on in settings. If the download failed, try again on a stronger connection.
 

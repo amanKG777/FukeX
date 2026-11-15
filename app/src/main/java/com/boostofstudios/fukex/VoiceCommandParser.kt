@@ -22,6 +22,9 @@ sealed interface VoiceCommand {
 	data object AmplifierDown : VoiceCommand
 	data object OpenDocs : VoiceCommand
 	data object Help : VoiceCommand
+	data object NextResult : VoiceCommand
+	data object PreviousResult : VoiceCommand
+	data class SelectResult(val index: Int) : VoiceCommand
 }
 
 // Turns what the speech recognizer heard into a command. Pure text in, command out, so it can be unit tested.
@@ -58,6 +61,25 @@ object VoiceCommandParser {
 	)
 	private val durationRegex = Regex("(\\d+|[a-z]+)\\s*(seconds?|secs?|minutes?|mins?)")
 
+	private val nextResultPhrases = listOf(
+		"next result", "another result", "next version", "another version", "different version",
+		"different one", "another one", "try another", "not this one", "next option",
+		"other version", "other one", "dusra bajao", "dusra chalao", "dusra wala",
+		"dusra song", "dusra track", "dusra result", "dusri audio", "agla result", "agla version"
+	)
+	private val prevResultPhrases = listOf(
+		"previous result", "pichla result", "pichla version", "last result", "previous version",
+		"pichla wala"
+	)
+
+	private val ordinalWords = mapOf(
+		"first" to 1, "1st" to 1, "pehla" to 1, "one" to 1, "1" to 1,
+		"second" to 2, "2nd" to 2, "dusra" to 2, "doosra" to 2, "two" to 2, "2" to 2,
+		"third" to 3, "3rd" to 3, "teesra" to 3, "three" to 3, "3" to 3,
+		"fourth" to 4, "4th" to 4, "chautha" to 4, "four" to 4, "4" to 4,
+		"fifth" to 5, "5th" to 5, "paanchwa" to 5, "five" to 5, "5" to 5
+	)
+
 	private fun wordRegex(keyword: String) = Regex("(^|\\s)${Regex.escape(keyword)}(\\s|$)")
 
 	private fun List<String>.matchIn(text: String): String? =
@@ -76,6 +98,8 @@ object VoiceCommandParser {
 	fun parse(text: String): VoiceCommand? {
 		val lower = normalize(text)
 		if (lower.isEmpty()) return null
+
+		resultCommand(lower)?.let { return it }
 
 		queueCommand(lower)?.let { return it }
 
@@ -132,6 +156,20 @@ object VoiceCommandParser {
 	private fun isSkipPhrase(query: String): Boolean {
 		val bare = query.removeSuffix(" song").removeSuffix(" track")
 		return bare in nextKeywords || bare in prevKeywords
+	}
+
+	private fun resultCommand(lower: String): VoiceCommand? {
+		val cleaned = lower.removePrefix("play ").removePrefix("the ").trim()
+		if (nextResultPhrases.any { lower.contains(it) || cleaned == it }) return VoiceCommand.NextResult
+		if (prevResultPhrases.any { lower.contains(it) || cleaned == it }) return VoiceCommand.PreviousResult
+
+		val selectRegex = Regex("^(?:play\\s+)?(?:result|option|version|item|number|no)?\\s*(\\d+|first|second|third|fourth|fifth|1st|2nd|3rd|4th|5th|one|two|three|four|five|pehla|dusra|doosra|teesra|chautha|paanchwa)\\s*(?:result|option|version|item|wala)?$")
+		selectRegex.matchEntire(lower.trim())?.let { m ->
+			val word = m.groupValues[1]
+			val num = word.toIntOrNull() ?: ordinalWords[word]
+			if (num != null && num in 1..20) return VoiceCommand.SelectResult(num)
+		}
+		return null
 	}
 
 	// "add <song> to queue", "queue <song>", "play <song> next"

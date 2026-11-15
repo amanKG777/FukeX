@@ -19,12 +19,24 @@ class VoiceCommandHandler(
 ) {
 	private enum class Mode { PLAY_NOW, PLAY_NEXT, ADD_TO_QUEUE }
 
-	// Where a spoken query was found: a saved playlist, the device library, or YouTube
-	private sealed interface Hit {
-		data class InPlaylist(val playlist: Playlist, val index: Int) : Hit
-		data class InLibrary(val label: String, val tracks: List<LibraryTrack>, val index: Int) : Hit
-		data class OnYoutube(val uri: Uri, val title: String) : Hit
+	// A candidate track or video found from playlist, library, or YouTube
+	private sealed interface Candidate {
+		val displayTitle: String
+		data class InPlaylist(val playlist: Playlist, val index: Int, override val displayTitle: String) : Candidate
+		data class InLibrary(val label: String, val tracks: List<LibraryTrack>, val index: Int, override val displayTitle: String) : Candidate
+		data class OnYoutube(val uri: Uri, val title: String, val uploader: String = "") : Candidate {
+			override val displayTitle: String get() = title
+		}
 	}
+
+	private data class SearchSession(
+		val query: String,
+		val candidates: List<Candidate>,
+		var currentIndex: Int,
+		val mode: Mode
+	)
+
+	private var activeSession: SearchSession? = null
 
 	private val engine get() = PlaybackEngine.get(activity)
 
@@ -37,8 +49,29 @@ class VoiceCommandHandler(
 			is VoiceCommand.AddToQueue -> playQuery(command.query, Mode.ADD_TO_QUEUE)
 			VoiceCommand.Resume -> engine.play()
 			VoiceCommand.Pause -> engine.pause()
-			VoiceCommand.Next -> engine.next()
-			VoiceCommand.Previous -> engine.previous()
+			VoiceCommand.Next -> {
+				val current = engine.state.value
+				val canAdvance = current.currentIndex < current.queue.lastIndex
+				val session = activeSession
+				if (!canAdvance && session != null && session.currentIndex + 1 < session.candidates.size) {
+					cycleSessionResult(delta = 1)
+				} else {
+					engine.next()
+				}
+			}
+			VoiceCommand.Previous -> {
+				val current = engine.state.value
+				val canGoBack = current.currentIndex > 0
+				val session = activeSession
+				if (!canGoBack && session != null && session.currentIndex > 0) {
+					cycleSessionResult(delta = -1)
+				} else {
+					engine.previous()
+				}
+			}
+			VoiceCommand.NextResult -> cycleSessionResult(delta = 1)
+			VoiceCommand.PreviousResult -> cycleSessionResult(delta = -1)
+			is VoiceCommand.SelectResult -> selectSessionResult(command.index)
 			VoiceCommand.Restart -> engine.seekTo(0)
 			is VoiceCommand.Seek -> seekBy(command.deltaSeconds)
 			VoiceCommand.VolumeUp -> adjustVolume(AudioManager.ADJUST_RAISE)
@@ -70,9 +103,41 @@ class VoiceCommandHandler(
 				})
 			}
 			VoiceCommand.Help -> speak(
-				"You can say: play a song name, play next, add a song to the queue, pause, resume, next, previous, " +
-					"forward or rewind, volume up or down, what's playing, amplifier on or off, or open documentation."
+				"You can say: play a song name, play next, add to queue, next result, previous result, or play result number. " +
+					"You can also say pause, resume, next, previous, forward or rewind, volume up or down, what's playing, amplifier on or off, or open documentation."
 			)
+		}
+	}
+
+	private fun cycleSessionResult(delta: Int) {
+		val session = activeSession
+		if (session == null || session.candidates.isEmpty()) {
+			speak("No active search results. Say play followed by a song name.")
+			return
+		}
+		val targetIndex = session.currentIndex + delta
+		if (targetIndex in session.candidates.indices) {
+			session.currentIndex = targetIndex
+			playCandidate(session.candidates[targetIndex], session.mode, session, targetIndex)
+		} else if (delta > 0) {
+			speak("That was the last result for ${session.query}.")
+		} else {
+			speak("You are already on the first result.")
+		}
+	}
+
+	private fun selectSessionResult(oneBasedIndex: Int) {
+		val session = activeSession
+		if (session == null || session.candidates.isEmpty()) {
+			speak("No active search results.")
+			return
+		}
+		val targetIndex = oneBasedIndex - 1
+		if (targetIndex in session.candidates.indices) {
+			session.currentIndex = targetIndex
+			playCandidate(session.candidates[targetIndex], session.mode, session, targetIndex)
+		} else {
+			speak("Please choose a number between 1 and ${session.candidates.size}.")
 		}
 	}
 
@@ -115,108 +180,156 @@ class VoiceCommandHandler(
 			return
 		}
 		Thread {
-			// Title lookups hit the ContentResolver per track, so keep all searching off the main thread
-			val hit = findInPlaylists(query) ?: findInLibrary(query)
-			if (hit != null) {
-				activity.runOnUiThread { play(hit, mode) }
+			val playlistHits = findAllInPlaylists(query)
+			if (playlistHits.isNotEmpty()) {
+				activity.runOnUiThread {
+					val session = SearchSession(query, playlistHits, 0, mode)
+					activeSession = session
+					playCandidate(playlistHits[0], mode, session, 0)
+				}
 				return@Thread
 			}
+
+			val libraryHits = findAllInLibrary(query)
+			if (libraryHits.isNotEmpty()) {
+				activity.runOnUiThread {
+					val session = SearchSession(query, libraryHits, 0, mode)
+					activeSession = session
+					playCandidate(libraryHits[0], mode, session, 0)
+				}
+				return@Thread
+			}
+
 			activity.runOnUiThread { speak("Searching YouTube for $query") }
-			val youtube = findOnYoutube(query)
+			val youtubeHits = findAllOnYoutube(query)
 			activity.runOnUiThread {
-				if (youtube != null) play(youtube, mode) else speak("Couldn't find $query.")
+				if (youtubeHits.isNotEmpty()) {
+					val session = SearchSession(query, youtubeHits, 0, mode)
+					activeSession = session
+					playCandidate(youtubeHits[0], mode, session, 0)
+				} else {
+					speak("Couldn't find $query.")
+				}
 			}
 		}.start()
 	}
 
-	private fun findInPlaylists(query: String): Hit? {
+	private fun findAllInPlaylists(query: String): List<Candidate.InPlaylist> {
+		val hits = mutableListOf<Candidate.InPlaylist>()
 		for (p in PlaylistManager.loadPlaylists(activity)) {
 			for (i in p.uris.indices) {
 				val uri = p.uris[i]
-				if (VoiceMatcher.matches(query, trackTitle(uri, i, activity)) || VoiceMatcher.matches(query, uri.toString())) {
-					return Hit.InPlaylist(p, i)
+				val title = trackTitle(uri, i, activity)
+				if (VoiceMatcher.matches(query, title) || VoiceMatcher.matches(query, uri.toString())) {
+					hits.add(Candidate.InPlaylist(p, i, title))
 				}
 			}
 		}
-		return null
+		return hits
 	}
 
-	private fun findInLibrary(query: String): Hit? {
+	private fun findAllInLibrary(query: String): List<Candidate.InLibrary> {
 		val tracks = MediaLibrary.scan(activity)
-		if (tracks.isEmpty()) return null
+		if (tracks.isEmpty()) return emptyList()
 		val byTitle = tracks.withIndex()
 			.map { it.index to VoiceMatcher.score(query, it.value.title) }
 			.filter { it.second >= 0 }
-			.maxByOrNull { it.second }
-		if (byTitle != null) return Hit.InLibrary(MediaLibrary.UNKNOWN, listOf(tracks[byTitle.first]), 0)
+			.sortedByDescending { it.second }
+		if (byTitle.isNotEmpty()) {
+			return byTitle.map {
+				val t = tracks[it.first]
+				Candidate.InLibrary(MediaLibrary.UNKNOWN, listOf(t), 0, t.title)
+			}
+		}
 
-		// No song by that name: maybe they asked for an artist or an album
+		// Check artist / album
 		val fields: List<(LibraryTrack) -> String> = listOf({ it.artist }, { it.album })
 		for (field in fields) {
 			val names = tracks.map(field).filter { it != MediaLibrary.UNKNOWN }.distinct()
 			val best = names.map { it to VoiceMatcher.score(query, it) }.filter { it.second >= 0 }.maxByOrNull { it.second }
-			if (best != null) return Hit.InLibrary(best.first, tracks.filter { field(it) == best.first }, 0)
+			if (best != null) {
+				val group = tracks.filter { field(it) == best.first }
+				return listOf(Candidate.InLibrary(best.first, group, 0, best.first))
+			}
 		}
-		return null
+		return emptyList()
 	}
 
-	private fun findOnYoutube(query: String): Hit? = try {
+	private fun findAllOnYoutube(query: String): List<Candidate.OnYoutube> = try {
 		val searchExtractor = org.schabi.newpipe.extractor.ServiceList.YouTube.getSearchExtractor(query)
 		searchExtractor.fetchPage()
-		val firstVideo = searchExtractor.initialPage.items
-			.firstOrNull { it is org.schabi.newpipe.extractor.stream.StreamInfoItem } as? org.schabi.newpipe.extractor.stream.StreamInfoItem
-		firstVideo?.let {
-			val videoId = it.url.substringAfterLast("v=").substringBefore("&")
-			Hit.OnYoutube(Uri.parse("youtube://$videoId?title=${Uri.encode(it.name)}"), it.name)
+		val videos = searchExtractor.initialPage.items
+			.filterIsInstance<org.schabi.newpipe.extractor.stream.StreamInfoItem>()
+			.take(10)
+		videos.map { item ->
+			val videoId = item.url.substringAfterLast("v=").substringBefore("&")
+			Candidate.OnYoutube(
+				uri = Uri.parse("youtube://$videoId?title=${Uri.encode(item.name)}"),
+				title = item.name,
+				uploader = item.uploaderName.orEmpty()
+			)
 		}
 	} catch (e: Exception) {
-		null
+		emptyList()
 	}
 
-	private fun play(hit: Hit, mode: Mode) {
-		when (hit) {
-			is Hit.InPlaylist -> {
-				val (playlist, index) = hit
+	private fun playCandidate(candidate: Candidate, mode: Mode, session: SearchSession?, index: Int) {
+		val total = session?.candidates?.size ?: 1
+		when (candidate) {
+			is Candidate.InPlaylist -> {
+				val (playlist, trackIndex, title) = candidate
 				if (playlist.pinHash != null && playlist.id !in VoicePlayRequests.unlockedPlaylistIds) {
 					speak("I found the song, but the playlist is encrypted. Can you unlock it so I can play?")
 					return
 				}
-				val uri = playlist.uris[index]
+				val uri = playlist.uris[trackIndex]
 				when (mode) {
 					Mode.PLAY_NOW -> {
-						speak("Playing from ${playlist.name}.")
-						// Play it where it lives instead of copying it into the open playlist
-						engine.playPlaylist(playlist, index)
+						if (total > 1) {
+							speak("Playing version ${index + 1} of $total: $title from ${playlist.name}. Say next version to switch.")
+						} else {
+							speak("Playing from ${playlist.name}.")
+						}
+						engine.playPlaylist(playlist, trackIndex)
 						VoicePlayRequests.focusPlaylistId.value = playlist.id
 					}
-					Mode.PLAY_NEXT -> { engine.playNext(uri); speak("${trackTitle(uri, index, activity)} will play next.") }
-					Mode.ADD_TO_QUEUE -> { engine.addToQueue(uri); speak("Added ${trackTitle(uri, index, activity)} to the queue.") }
+					Mode.PLAY_NEXT -> { engine.playNext(uri); speak("$title will play next.") }
+					Mode.ADD_TO_QUEUE -> { engine.addToQueue(uri); speak("Added $title to the queue.") }
 				}
 			}
-			is Hit.InLibrary -> {
-				val first = hit.tracks[hit.index]
-				val isGroup = hit.tracks.size > 1
+			is Candidate.InLibrary -> {
+				val first = candidate.tracks[candidate.index]
+				val isGroup = candidate.tracks.size > 1
 				when (mode) {
 					Mode.PLAY_NOW -> {
-						speak(if (isGroup) "Playing ${hit.label}." else "Playing ${first.title} by ${first.artist}.")
-						engine.playTracks(if (isGroup) hit.label else "Library", hit.tracks.map { it.uri }, hit.index)
+						if (total > 1) {
+							speak("Playing match ${index + 1} of $total: ${first.title}. Say next version to switch.")
+						} else {
+							speak(if (isGroup) "Playing ${candidate.label}." else "Playing ${first.title} by ${first.artist}.")
+						}
+						engine.playTracks(if (isGroup) candidate.label else "Library", candidate.tracks.map { it.uri }, candidate.index)
 					}
 					Mode.PLAY_NEXT -> {
-						// Reversed, so the group ends up in its original order right after the current track
-						hit.tracks.reversed().forEach { engine.playNext(it.uri) }
-						speak(if (isGroup) "${hit.label} will play next." else "${first.title} will play next.")
+						candidate.tracks.reversed().forEach { engine.playNext(it.uri) }
+						speak(if (isGroup) "${candidate.label} will play next." else "${first.title} will play next.")
 					}
 					Mode.ADD_TO_QUEUE -> {
-						hit.tracks.forEach { engine.addToQueue(it.uri) }
-						speak(if (isGroup) "Added ${hit.label} to the queue." else "Added ${first.title} to the queue.")
+						candidate.tracks.forEach { engine.addToQueue(it.uri) }
+						speak(if (isGroup) "Added ${candidate.label} to the queue." else "Added ${first.title} to the queue.")
 					}
 				}
 			}
-			is Hit.OnYoutube -> when (mode) {
-				// Queued as "play next", so no playlist gets a permanent copy
-				Mode.PLAY_NOW -> { speak("Playing ${hit.title} from YouTube."); engine.playUri(hit.uri) }
-				Mode.PLAY_NEXT -> { engine.playNext(hit.uri); speak("${hit.title} will play next.") }
-				Mode.ADD_TO_QUEUE -> { engine.addToQueue(hit.uri); speak("Added ${hit.title} to the queue.") }
+			is Candidate.OnYoutube -> when (mode) {
+				Mode.PLAY_NOW -> {
+					if (total > 1) {
+						speak("Playing result ${index + 1} of $total: ${candidate.title}. Say next result to switch.")
+					} else {
+						speak("Playing ${candidate.title} from YouTube.")
+					}
+					engine.playUri(candidate.uri)
+				}
+				Mode.PLAY_NEXT -> { engine.playNext(candidate.uri); speak("${candidate.title} will play next.") }
+				Mode.ADD_TO_QUEUE -> { engine.addToQueue(candidate.uri); speak("Added ${candidate.title} to the queue.") }
 			}
 		}
 	}

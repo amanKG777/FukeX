@@ -44,17 +44,6 @@ fun ExitDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
 }
 
 @Composable
-fun UpdateAvailableDialog(onUpdate: () -> Unit, onDismiss: () -> Unit) {
-	AlertDialog(
-		onDismissRequest = onDismiss,
-		title = { Text("New Version Available") },
-		text = { Text("A new version of FukeX is available. Would you like to update?") },
-		confirmButton = { Button(onClick = onUpdate) { Text("Update") } },
-		dismissButton = { TextButton(onClick = onDismiss) { Text("Later") } }
-	)
-}
-
-@Composable
 fun StorageRationaleDialog(onOpenSettings: () -> Unit, onDismiss: () -> Unit) {
 	AlertDialog(
 		modifier = Modifier.semantics { paneTitle = "Storage access needed" },

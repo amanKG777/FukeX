@@ -18,6 +18,7 @@ Grab the latest signed APK from the [Releases](../../releases/latest) page, or f
 * Synced lyrics from `.lrc` files or lrclib.net
 * Voice assistant: shake twice, then say things like "play <song>", "add <song> to queue", "forward 30 seconds", "what's playing"
 * Optional visual icon pack, downloaded on request from `iconpacks/` on GitHub (see [iconpacks/README.md](iconpacks/README.md))
+* In-app updates: checks GitHub releases with semantic version comparison, downloads the signed APK, verifies it (checksum, package, version and signing key) and hands it to the system installer
 * Background playback engine with media notification, lock screen, Bluetooth and Android Auto controls
 
 ## What it's built with
