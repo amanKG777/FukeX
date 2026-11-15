@@ -524,6 +524,8 @@ In the settings screen, you'll see the following options, grouped under headings
 
 * Assistant Voice: Choose which installed Text-to-Speech (TTS) engine on your device speaks the voice assistant responses.
 
+* Customize Spoken Feedback: Tick boxes to control what events the assistant speaks for (listening, searching, playing, switching results, or controls). When an event is turned off, the assistant plays a short feedback beep instead of speaking.
+
 ### Fading (Gapless Playback)
 
 * Event selector, plus the Fade In and Fade Out sliders described in the fading section above.

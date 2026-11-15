@@ -22,6 +22,7 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import com.boostofstudios.fukex.data.LockTimeout
 import com.boostofstudios.fukex.data.SettingsManager
+import com.boostofstudios.fukex.data.VoiceSpeechEvent
 import android.content.Context
 import android.content.ContextWrapper
 
@@ -52,6 +53,7 @@ fun SettingsScreen(
 	var showTimeoutDialog by remember { mutableStateOf(false) }
 	var ttsEngine by remember { mutableStateOf(SettingsManager.getVoiceAssistantTtsEngine(context)) }
 	var showTtsDialog by remember { mutableStateOf(false) }
+	var showVoiceFeedbackDialog by remember { mutableStateOf(false) }
 	var showAboutScreen by remember { mutableStateOf(false) }
 	var amplifierLevel by remember { mutableIntStateOf(SettingsManager.getAmplifierLevel(context)) }
 	var showAmplifierWarning by remember { mutableStateOf(false) }
@@ -294,6 +296,16 @@ fun SettingsScreen(
 								stateDescription = currentEngineLabel
 							}
 					)
+					ListItem(
+						headlineContent = { Text("Customize Spoken Feedback") },
+						supportingContent = { Text("Choose what the assistant speaks or beeps for") },
+						leadingContent = { Icon(FxIcons.GraphicEq, null) },
+						modifier = Modifier
+							.clickable { showVoiceFeedbackDialog = true }
+							.semantics {
+								role = Role.Button
+							}
+					)
 				}
 			}
 			item {
@@ -482,6 +494,53 @@ fun SettingsScreen(
 			},
 			confirmButton = {
 				TextButton(onClick = { showTtsDialog = false }) { Text("Cancel") }
+			}
+		)
+	}
+	if (showVoiceFeedbackDialog) {
+		AlertDialog(
+			onDismissRequest = { showVoiceFeedbackDialog = false },
+			title = { Text("Customize What Assistant Speaks") },
+			text = {
+				Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+					VoiceSpeechEvent.entries.forEach { event ->
+						var isChecked by remember(event) {
+							mutableStateOf(SettingsManager.isVoiceSpeechEventEnabled(context, event))
+						}
+						Row(
+							modifier = Modifier
+								.fillMaxWidth()
+								.clickable {
+									val next = !isChecked
+									SettingsManager.setVoiceSpeechEventEnabled(context, event, next)
+									isChecked = next
+								}
+								.padding(vertical = 8.dp)
+								.semantics {
+									role = Role.Checkbox
+									stateDescription = if (isChecked) "Speaks" else "Beeps only"
+								},
+							verticalAlignment = Alignment.CenterVertically
+						) {
+							Checkbox(
+								checked = isChecked,
+								onCheckedChange = null
+							)
+							Spacer(Modifier.width(8.dp))
+							Column(modifier = Modifier.weight(1f)) {
+								Text(event.title, style = MaterialTheme.typography.bodyLarge)
+								Text(
+									if (isChecked) event.speechDescription else "Beeps instead of speaking",
+									style = MaterialTheme.typography.bodySmall,
+									color = MaterialTheme.colorScheme.onSurfaceVariant
+								)
+							}
+						}
+					}
+				}
+			},
+			confirmButton = {
+				TextButton(onClick = { showVoiceFeedbackDialog = false }) { Text("Done") }
 			}
 		)
 	}

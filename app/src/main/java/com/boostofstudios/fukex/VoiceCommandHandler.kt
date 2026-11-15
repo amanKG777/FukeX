@@ -10,6 +10,7 @@ import com.boostofstudios.fukex.data.MediaLibrary
 import com.boostofstudios.fukex.data.Playlist
 import com.boostofstudios.fukex.data.PlaylistManager
 import com.boostofstudios.fukex.data.SettingsManager
+import com.boostofstudios.fukex.data.VoiceSpeechEvent
 import com.boostofstudios.fukex.playback.PlaybackEngine
 
 // Turns parsed voice commands into playback actions.
@@ -41,6 +42,15 @@ class VoiceCommandHandler(
 	private val engine get() = PlaybackEngine.get(activity)
 
 	private fun speak(text: String) = assistant()?.speak(text)
+
+	private fun speakOrBeep(event: VoiceSpeechEvent, text: String, onDone: (() -> Unit)? = null) {
+		if (SettingsManager.isVoiceSpeechEventEnabled(activity, event)) {
+			assistant()?.speak(text, onDone)
+		} else {
+			playFeedbackBeep()
+			onDone?.let { activity.runOnUiThread(it) }
+		}
+	}
 
 	fun handle(command: VoiceCommand) {
 		when (command) {
@@ -79,24 +89,24 @@ class VoiceCommandHandler(
 			VoiceCommand.WhatsPlaying -> announceCurrentTrack()
 			VoiceCommand.AmplifierOn -> {
 				SettingsManager.setAmplifierEnabled(activity, true)
-				speak("Amplifier on")
+				speakOrBeep(VoiceSpeechEvent.CONTROLS, "Amplifier on")
 			}
 			VoiceCommand.AmplifierOff -> {
 				SettingsManager.setAmplifierEnabled(activity, false)
-				speak("Amplifier off")
+				speakOrBeep(VoiceSpeechEvent.CONTROLS, "Amplifier off")
 			}
 			VoiceCommand.AmplifierUp -> {
 				val level = minOf(1500, SettingsManager.getAmplifierLevel(activity) + 500)
 				SettingsManager.setAmplifierLevel(activity, level)
-				speak("Amplifier increased")
+				speakOrBeep(VoiceSpeechEvent.CONTROLS, "Amplifier increased")
 			}
 			VoiceCommand.AmplifierDown -> {
 				val level = maxOf(0, SettingsManager.getAmplifierLevel(activity) - 500)
 				SettingsManager.setAmplifierLevel(activity, level)
-				speak("Amplifier decreased")
+				speakOrBeep(VoiceSpeechEvent.CONTROLS, "Amplifier decreased")
 			}
 			VoiceCommand.OpenDocs -> {
-				speak("Opening documentation")
+				speakOrBeep(VoiceSpeechEvent.CONTROLS, "Opening documentation")
 				VoicePlayRequests.openDocs.value = true
 				activity.startActivity(Intent(activity, MainActivity::class.java).apply {
 					flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
@@ -112,7 +122,7 @@ class VoiceCommandHandler(
 	private fun cycleSessionResult(delta: Int) {
 		val session = activeSession
 		if (session == null || session.candidates.isEmpty()) {
-			speak("No active search results. Say play followed by a song name.")
+			speakOrBeep(VoiceSpeechEvent.ERRORS, "No active search results. Say play followed by a song name.")
 			return
 		}
 		val targetIndex = session.currentIndex + delta
@@ -120,16 +130,16 @@ class VoiceCommandHandler(
 			session.currentIndex = targetIndex
 			playCandidate(session.candidates[targetIndex], session.mode, session, targetIndex)
 		} else if (delta > 0) {
-			speak("That was the last result for ${session.query}.")
+			speakOrBeep(VoiceSpeechEvent.RESULTS, "That was the last result for ${session.query}.")
 		} else {
-			speak("You are already on the first result.")
+			speakOrBeep(VoiceSpeechEvent.RESULTS, "You are already on the first result.")
 		}
 	}
 
 	private fun selectSessionResult(oneBasedIndex: Int) {
 		val session = activeSession
 		if (session == null || session.candidates.isEmpty()) {
-			speak("No active search results.")
+			speakOrBeep(VoiceSpeechEvent.ERRORS, "No active search results.")
 			return
 		}
 		val targetIndex = oneBasedIndex - 1
@@ -137,7 +147,7 @@ class VoiceCommandHandler(
 			session.currentIndex = targetIndex
 			playCandidate(session.candidates[targetIndex], session.mode, session, targetIndex)
 		} else {
-			speak("Please choose a number between 1 and ${session.candidates.size}.")
+			speakOrBeep(VoiceSpeechEvent.RESULTS, "Please choose a number between 1 and ${session.candidates.size}.")
 		}
 	}
 
@@ -147,7 +157,7 @@ class VoiceCommandHandler(
 		if (progress.durationMs > 0 && target >= progress.durationMs) engine.next() else engine.seekTo(target)
 		val seconds = kotlin.math.abs(deltaSeconds)
 		val amount = if (seconds >= 60 && seconds % 60 == 0) "${seconds / 60} minute${if (seconds == 60) "" else "s"}" else "$seconds seconds"
-		speak(if (deltaSeconds > 0) "Forward $amount" else "Back $amount")
+		speakOrBeep(VoiceSpeechEvent.CONTROLS, if (deltaSeconds > 0) "Forward $amount" else "Back $amount")
 	}
 
 	private fun adjustVolume(direction: Int) {
@@ -200,7 +210,7 @@ class VoiceCommandHandler(
 				return@Thread
 			}
 
-			activity.runOnUiThread { speak("Searching YouTube for $query") }
+			activity.runOnUiThread { speakOrBeep(VoiceSpeechEvent.SEARCHING, "Searching YouTube for $query") }
 			val youtubeHits = findAllOnYoutube(query)
 			activity.runOnUiThread {
 				if (youtubeHits.isNotEmpty()) {
@@ -208,7 +218,7 @@ class VoiceCommandHandler(
 					activeSession = session
 					playCandidate(youtubeHits[0], mode, session, 0)
 				} else {
-					speak("Couldn't find $query.")
+					speakOrBeep(VoiceSpeechEvent.ERRORS, "Couldn't find $query.")
 				}
 			}
 		}.start()
@@ -279,22 +289,27 @@ class VoiceCommandHandler(
 			is Candidate.InPlaylist -> {
 				val (playlist, trackIndex, title) = candidate
 				if (playlist.pinHash != null && playlist.id !in VoicePlayRequests.unlockedPlaylistIds) {
-					speak("I found the song, but the playlist is encrypted. Can you unlock it so I can play?")
+					speakOrBeep(VoiceSpeechEvent.ERRORS, "I found the song, but the playlist is encrypted. Can you unlock it so I can play?")
 					return
 				}
 				val uri = playlist.uris[trackIndex]
 				when (mode) {
 					Mode.PLAY_NOW -> {
 						if (total > 1) {
-							speak("Playing version ${index + 1} of $total: $title from ${playlist.name}. Say next version to switch.")
+							val msg = if (index == 0) {
+								"Playing version 1 of $total: $title from ${playlist.name}. Say next version to switch."
+							} else {
+								"Playing version ${index + 1} of $total: $title from ${playlist.name}."
+							}
+							speakOrBeep(if (index == 0) VoiceSpeechEvent.PLAYING else VoiceSpeechEvent.RESULTS, msg)
 						} else {
-							speak("Playing from ${playlist.name}.")
+							speakOrBeep(VoiceSpeechEvent.PLAYING, "Playing from ${playlist.name}.")
 						}
 						engine.playPlaylist(playlist, trackIndex)
 						VoicePlayRequests.focusPlaylistId.value = playlist.id
 					}
-					Mode.PLAY_NEXT -> { engine.playNext(uri); speak("$title will play next.") }
-					Mode.ADD_TO_QUEUE -> { engine.addToQueue(uri); speak("Added $title to the queue.") }
+					Mode.PLAY_NEXT -> { engine.playNext(uri); speakOrBeep(VoiceSpeechEvent.PLAYING, "$title will play next.") }
+					Mode.ADD_TO_QUEUE -> { engine.addToQueue(uri); speakOrBeep(VoiceSpeechEvent.PLAYING, "Added $title to the queue.") }
 				}
 			}
 			is Candidate.InLibrary -> {
@@ -303,33 +318,43 @@ class VoiceCommandHandler(
 				when (mode) {
 					Mode.PLAY_NOW -> {
 						if (total > 1) {
-							speak("Playing match ${index + 1} of $total: ${first.title}. Say next version to switch.")
+							val msg = if (index == 0) {
+								"Playing match 1 of $total: ${first.title}. Say next version to switch."
+							} else {
+								"Playing match ${index + 1} of $total: ${first.title}."
+							}
+							speakOrBeep(if (index == 0) VoiceSpeechEvent.PLAYING else VoiceSpeechEvent.RESULTS, msg)
 						} else {
-							speak(if (isGroup) "Playing ${candidate.label}." else "Playing ${first.title} by ${first.artist}.")
+							speakOrBeep(VoiceSpeechEvent.PLAYING, if (isGroup) "Playing ${candidate.label}." else "Playing ${first.title} by ${first.artist}.")
 						}
 						engine.playTracks(if (isGroup) candidate.label else "Library", candidate.tracks.map { it.uri }, candidate.index)
 					}
 					Mode.PLAY_NEXT -> {
 						candidate.tracks.reversed().forEach { engine.playNext(it.uri) }
-						speak(if (isGroup) "${candidate.label} will play next." else "${first.title} will play next.")
+						speakOrBeep(VoiceSpeechEvent.PLAYING, if (isGroup) "${candidate.label} will play next." else "${first.title} will play next.")
 					}
 					Mode.ADD_TO_QUEUE -> {
 						candidate.tracks.forEach { engine.addToQueue(it.uri) }
-						speak(if (isGroup) "Added ${candidate.label} to the queue." else "Added ${first.title} to the queue.")
+						speakOrBeep(VoiceSpeechEvent.PLAYING, if (isGroup) "Added ${candidate.label} to the queue." else "Added ${first.title} to the queue.")
 					}
 				}
 			}
 			is Candidate.OnYoutube -> when (mode) {
 				Mode.PLAY_NOW -> {
 					if (total > 1) {
-						speak("Playing result ${index + 1} of $total: ${candidate.title}. Say next result to switch.")
+						val msg = if (index == 0) {
+							"Playing result 1 of $total: ${candidate.title}. Say next result to switch."
+						} else {
+							"Playing result ${index + 1} of $total: ${candidate.title}."
+						}
+						speakOrBeep(if (index == 0) VoiceSpeechEvent.PLAYING else VoiceSpeechEvent.RESULTS, msg)
 					} else {
-						speak("Playing ${candidate.title} from YouTube.")
+						speakOrBeep(VoiceSpeechEvent.PLAYING, "Playing ${candidate.title} from YouTube.")
 					}
 					engine.playUri(candidate.uri)
 				}
-				Mode.PLAY_NEXT -> { engine.playNext(candidate.uri); speak("${candidate.title} will play next.") }
-				Mode.ADD_TO_QUEUE -> { engine.addToQueue(candidate.uri); speak("Added ${candidate.title} to the queue.") }
+				Mode.PLAY_NEXT -> { engine.playNext(candidate.uri); speakOrBeep(VoiceSpeechEvent.PLAYING, "${candidate.title} will play next.") }
+				Mode.ADD_TO_QUEUE -> { engine.addToQueue(candidate.uri); speakOrBeep(VoiceSpeechEvent.PLAYING, "Added ${candidate.title} to the queue.") }
 			}
 		}
 	}

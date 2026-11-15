@@ -17,6 +17,7 @@ import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import androidx.core.content.ContextCompat
 import com.boostofstudios.fukex.data.SettingsManager
+import com.boostofstudios.fukex.data.VoiceSpeechEvent
 import java.util.Locale
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -79,7 +80,11 @@ class VoiceAssistantManager(
         if (isListening) {
             speechRecognizer?.cancel()
             finishListening()
-            speak("I didn't hear anything.")
+            if (SettingsManager.isVoiceSpeechEventEnabled(context, VoiceSpeechEvent.ERRORS)) {
+                speak("I didn't hear anything.")
+            } else {
+                playFeedbackBeep()
+            }
         }
     }
 
@@ -154,11 +159,17 @@ class VoiceAssistantManager(
         mainHandler.postDelayed(watchdog, LISTEN_WATCHDOG_MS)
         // Quiet the music so it doesn't drown out the user, and so the prompt is heard
         requestDuckFocus()
-        speak("Listening") {
-            if (isListening) {
-                // Short 120ms pause after TTS completes to ensure audio track release before mic opens
-                mainHandler.postDelayed({ if (isListening) listenInternal() }, 120)
+        val speakListening = SettingsManager.isVoiceSpeechEventEnabled(context, VoiceSpeechEvent.LISTENING)
+        if (speakListening) {
+            speak("Listening") {
+                if (isListening) {
+                    // Short 120ms pause after TTS completes to ensure audio track release before mic opens
+                    mainHandler.postDelayed({ if (isListening) listenInternal() }, 120)
+                }
             }
+        } else {
+            playFeedbackBeep()
+            mainHandler.postDelayed({ if (isListening) listenInternal() }, 120)
         }
     }
 
@@ -216,28 +227,40 @@ class VoiceAssistantManager(
                 }
 
                 finishListening()
-                speak(
-                    when (error) {
-                        SpeechRecognizer.ERROR_NO_MATCH -> "Sorry, I didn't catch that."
-                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "I didn't hear anything."
-                        SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT, SpeechRecognizer.ERROR_SERVER ->
-                            "Speech recognition needs an internet connection."
-                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "I need microphone permission."
-                        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "The speech service is busy. Try again in a moment."
-                        else -> "Something went wrong with speech recognition."
-                    }
-                )
+                if (SettingsManager.isVoiceSpeechEventEnabled(context, VoiceSpeechEvent.ERRORS)) {
+                    speak(
+                        when (error) {
+                            SpeechRecognizer.ERROR_NO_MATCH -> "Sorry, I didn't catch that."
+                            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "I didn't hear anything."
+                            SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT, SpeechRecognizer.ERROR_SERVER ->
+                                "Speech recognition needs an internet connection."
+                            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "I need microphone permission."
+                            SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "The speech service is busy. Try again in a moment."
+                            else -> "Something went wrong with speech recognition."
+                        }
+                    )
+                } else {
+                    playFeedbackBeep()
+                }
             }
             override fun onResults(results: Bundle?) {
                 finishListening()
                 val heard = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION).orEmpty()
                 if (heard.isEmpty()) {
-                    speak("Sorry, I didn't catch that.")
+                    if (SettingsManager.isVoiceSpeechEventEnabled(context, VoiceSpeechEvent.ERRORS)) {
+                        speak("Sorry, I didn't catch that.")
+                    } else {
+                        playFeedbackBeep()
+                    }
                     return
                 }
                 val command = VoiceCommandParser.parse(heard)
                 if (command == null) {
-                    speak("Sorry, I didn't understand \"${heard.first()}\". Say help for what I can do.")
+                    if (SettingsManager.isVoiceSpeechEventEnabled(context, VoiceSpeechEvent.ERRORS)) {
+                        speak("Sorry, I didn't understand \"${heard.first()}\". Say help for what I can do.")
+                    } else {
+                        playFeedbackBeep()
+                    }
                 } else {
                     onCommand(command)
                 }
@@ -250,7 +273,11 @@ class VoiceAssistantManager(
             recognizer.startListening(intent)
         } catch (e: Exception) {
             finishListening()
-            speak("Could not start speech recognition.")
+            if (SettingsManager.isVoiceSpeechEventEnabled(context, VoiceSpeechEvent.ERRORS)) {
+                speak("Could not start speech recognition.")
+            } else {
+                playFeedbackBeep()
+            }
         }
     }
 

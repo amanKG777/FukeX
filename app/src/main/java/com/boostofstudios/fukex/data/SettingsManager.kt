@@ -9,6 +9,43 @@ enum class LockTimeout(val minutes: Int, val label: String) {
     SCREEN_LOCK(-1, "When Screen Locks")
 }
 
+enum class VoiceSpeechEvent(
+    val key: String,
+    val title: String,
+    val speechDescription: String
+) {
+    LISTENING(
+        "voice_speak_listening",
+        "When listening",
+        "Speak 'Listening' prompt (uncheck to beep only)"
+    ),
+    SEARCHING(
+        "voice_speak_searching",
+        "When searching for a video or song",
+        "Speak 'Searching YouTube for...' (uncheck to beep only)"
+    ),
+    PLAYING(
+        "voice_speak_playing",
+        "When playing a video or song",
+        "Announce title when playback starts (uncheck to beep only)"
+    ),
+    RESULTS(
+        "voice_speak_results",
+        "When switching results or versions",
+        "Announce result number and title (uncheck to beep only)"
+    ),
+    CONTROLS(
+        "voice_speak_controls",
+        "When adjusting controls",
+        "Confirm seek, volume, and amplifier (uncheck to beep only)"
+    ),
+    ERRORS(
+        "voice_speak_errors",
+        "When errors or unrecognised speech occur",
+        "Speak error messages (uncheck to beep only)"
+    )
+}
+
 object SettingsManager {
     private const val PREFS_NAME = "fukex_settings"
     private const val KEY_BIOMETRIC_ENABLED = "biometric_enabled"
@@ -186,6 +223,14 @@ object SettingsManager {
 
     fun setVoiceAssistantTtsEngine(context: Context, enginePackage: String?) {
         getPrefs(context).edit().putString(KEY_VOICE_ASSISTANT_TTS_ENGINE, enginePackage).apply()
+    }
+
+    fun isVoiceSpeechEventEnabled(context: Context, event: VoiceSpeechEvent): Boolean {
+        return getPrefs(context).getBoolean(event.key, true)
+    }
+
+    fun setVoiceSpeechEventEnabled(context: Context, event: VoiceSpeechEvent, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(event.key, enabled).apply()
     }
 
     // Off by default: TalkBack only reads lyric lines when the user opts in
