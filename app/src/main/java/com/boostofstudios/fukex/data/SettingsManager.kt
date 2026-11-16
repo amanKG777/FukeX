@@ -217,6 +217,46 @@ object SettingsManager {
         getPrefs(context).edit().putBoolean(KEY_VOICE_ASSISTANT_BACKGROUND, enabled).apply()
     }
 
+    // Holding Volume Down is the main trigger; shaking is an optional extra
+    fun isVoiceShakeEnabled(context: Context): Boolean =
+        getPrefs(context).getBoolean(KEY_VOICE_SHAKE_ENABLED, false)
+
+    fun setVoiceShakeEnabled(context: Context, enabled: Boolean) =
+        getPrefs(context).edit().putBoolean(KEY_VOICE_SHAKE_ENABLED, enabled).apply()
+
+    // 1 (needs a hard shake) .. 5 (a light shake is enough)
+    fun getVoiceShakeSensitivity(context: Context): Int =
+        getPrefs(context).getInt(KEY_VOICE_SHAKE_SENSITIVITY, DEFAULT_SHAKE_SENSITIVITY)
+            .coerceIn(MIN_SHAKE_SENSITIVITY, MAX_SHAKE_SENSITIVITY)
+
+    fun setVoiceShakeSensitivity(context: Context, level: Int) =
+        getPrefs(context).edit()
+            .putInt(KEY_VOICE_SHAKE_SENSITIVITY, level.coerceIn(MIN_SHAKE_SENSITIVITY, MAX_SHAKE_SENSITIVITY))
+            .apply()
+
+    // Acceleration (in g) a shake has to exceed at each sensitivity level
+    fun shakeThresholdFor(level: Int): Float = when (level.coerceIn(MIN_SHAKE_SENSITIVITY, MAX_SHAKE_SENSITIVITY)) {
+        1 -> 2.6f
+        2 -> 2.1f
+        3 -> 1.75f
+        4 -> 1.5f
+        else -> 1.3f
+    }
+
+    fun shakeSensitivityLabel(level: Int): String = when (level.coerceIn(MIN_SHAKE_SENSITIVITY, MAX_SHAKE_SENSITIVITY)) {
+        1 -> "Very low"
+        2 -> "Low"
+        3 -> "Medium"
+        4 -> "High"
+        else -> "Very high"
+    }
+
+    const val KEY_VOICE_SHAKE_ENABLED = "voice_assistant_shake"
+    const val KEY_VOICE_SHAKE_SENSITIVITY = "voice_assistant_shake_sensitivity"
+    const val MIN_SHAKE_SENSITIVITY = 1
+    const val MAX_SHAKE_SENSITIVITY = 5
+    private const val DEFAULT_SHAKE_SENSITIVITY = 3
+
     fun getVoiceAssistantTtsEngine(context: Context): String? {
         return getPrefs(context).getString(KEY_VOICE_ASSISTANT_TTS_ENGINE, null)
     }

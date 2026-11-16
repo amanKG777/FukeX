@@ -71,7 +71,10 @@ class VoiceAssistantManager(
     private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
     private var tts: TextToSpeech? = null
-    private var ttsReady = false
+    @Volatile private var ttsReady = false
+    // One shared listener: replacing it per utterance lost the callback of whatever
+    // utterance got flushed, which could leave the assistant stuck "listening"
+    private val utteranceCallbacks = java.util.concurrent.ConcurrentHashMap<String, () -> Unit>()
     private var speechRecognizer: SpeechRecognizer? = null
     private var isListening = false
     private var retryAttempt = 0
@@ -97,12 +100,27 @@ class VoiceAssistantManager(
         tts?.shutdown()
         tts = null
         ttsReady = false
+        flushUtteranceCallbacks()
         initTts()
+    }
+
+    private fun flushUtteranceCallbacks() {
+        val pending = utteranceCallbacks.values.toList()
+        utteranceCallbacks.clear()
+        pending.forEach { mainHandler.post(it) }
+    }
+
+    private fun completeUtterance(id: String?) {
+        id ?: return
+        utteranceCallbacks.remove(id)?.let { mainHandler.post(it) }
     }
 
     private fun initTts() {
         val enginePackage = SettingsManager.getVoiceAssistantTtsEngine(context)
+        var created: TextToSpeech? = null
         val onInit = TextToSpeech.OnInitListener { status ->
+            // A late callback from an engine that was since replaced must not touch the new one
+            if (created !== tts) return@OnInitListener
             if (status == TextToSpeech.SUCCESS) {
                 val res = tts?.setLanguage(Locale.getDefault())
                 if (res == TextToSpeech.LANG_MISSING_DATA || res == TextToSpeech.LANG_NOT_SUPPORTED) {
@@ -114,14 +132,23 @@ class VoiceAssistantManager(
                         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                         .build()
                 )
+                tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                    override fun onStart(id: String?) {}
+                    override fun onDone(id: String?) = completeUtterance(id)
+                    @Deprecated("Deprecated in Java")
+                    override fun onError(id: String?) = completeUtterance(id)
+                    override fun onError(id: String?, errorCode: Int) = completeUtterance(id)
+                    override fun onStop(id: String?, interrupted: Boolean) = completeUtterance(id)
+                })
                 ttsReady = true
             }
         }
-        tts = if (!enginePackage.isNullOrBlank()) {
+        created = if (!enginePackage.isNullOrBlank()) {
             TextToSpeech(context, onInit, enginePackage)
         } else {
             TextToSpeech(context, onInit)
         }
+        tts = created
     }
 
     fun speak(text: String, onDone: (() -> Unit)? = null) {
@@ -132,15 +159,12 @@ class VoiceAssistantManager(
             return
         }
         val utteranceId = java.util.UUID.randomUUID().toString()
-        engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-            override fun onStart(id: String?) {}
-            override fun onDone(id: String?) { if (id == utteranceId) onDone?.let { mainHandler.post(it) } }
-            @Deprecated("Deprecated in Java")
-            override fun onError(id: String?) { if (id == utteranceId) onDone?.let { mainHandler.post(it) } }
-            override fun onStop(id: String?, interrupted: Boolean) { if (id == utteranceId) onDone?.let { mainHandler.post(it) } }
-        })
+        if (onDone != null) utteranceCallbacks[utteranceId] = onDone
         val params = Bundle().apply { putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, utteranceId) }
-        engine.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
+        if (engine.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId) != TextToSpeech.SUCCESS) {
+            // The engine refused the request, so no progress callback will come
+            completeUtterance(utteranceId)
+        }
     }
 
     fun startListening() {
@@ -157,6 +181,8 @@ class VoiceAssistantManager(
         isListening = true
         retryAttempt = 0
         mainHandler.postDelayed(watchdog, LISTEN_WATCHDOG_MS)
+        // Acknowledge every trigger (volume hold, shake, background) here, once per session
+        vibrate()
         // Quiet the music so it doesn't drown out the user, and so the prompt is heard
         requestDuckFocus()
         val speakListening = SettingsManager.isVoiceSpeechEventEnabled(context, VoiceSpeechEvent.LISTENING)
@@ -170,6 +196,20 @@ class VoiceAssistantManager(
         } else {
             playFeedbackBeep()
             mainHandler.postDelayed({ if (isListening) listenInternal() }, 120)
+        }
+    }
+
+    private fun vibrate() {
+        try {
+            val vibrator = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                (context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? android.os.VibratorManager)?.defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                context.getSystemService(Context.VIBRATOR_SERVICE) as? android.os.Vibrator
+            } ?: return
+            vibrator.vibrate(android.os.VibrationEffect.createOneShot(200, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
+        } catch (e: Exception) {
+            // No vibrator on this device
         }
     }
 
@@ -308,7 +348,10 @@ class VoiceAssistantManager(
     }
 
     fun destroy() {
+        isListening = false
         mainHandler.removeCallbacks(watchdog)
+        mainHandler.removeCallbacksAndMessages(null)
+        utteranceCallbacks.clear()
         releaseDuckFocus()
         tts?.stop()
         tts?.shutdown()

@@ -260,10 +260,24 @@ fun SettingsScreen(
 				SettingsHeader("Voice Assistant")
 				var isVoiceAssistantEnabled by remember { mutableStateOf(SettingsManager.isVoiceAssistantEnabled(context)) }
 				var isVoiceAssistantBackgroundEnabled by remember { mutableStateOf(SettingsManager.isVoiceAssistantBackgroundEnabled(context)) }
-				
+				var isShakeEnabled by remember { mutableStateOf(SettingsManager.isVoiceShakeEnabled(context)) }
+				var shakeSensitivity by remember { mutableIntStateOf(SettingsManager.getVoiceShakeSensitivity(context)) }
+				// Re-checked on resume, since the user turns it on in the system's accessibility settings
+				var isVolumeKeyServiceOn by remember { mutableStateOf(VolumeKeyAccessibilityService.isEnabled(context)) }
+				val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+				DisposableEffect(lifecycleOwner) {
+					val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+						if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+							isVolumeKeyServiceOn = VolumeKeyAccessibilityService.isEnabled(context)
+						}
+					}
+					lifecycleOwner.lifecycle.addObserver(observer)
+					onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+				}
+
 				SettingsToggleItem(
 					title = "Enable Voice Assistant",
-					subtitle = "Shake your phone twice to talk to the voice assistant",
+					subtitle = "Press and hold Volume Down to talk to the voice assistant. A short press still lowers the volume.",
 					icon = FxIcons.Mic,
 					checked = isVoiceAssistantEnabled,
 					onCheckedChange = { 
@@ -277,7 +291,7 @@ fun SettingsScreen(
 
 					SettingsToggleItem(
 						title = "Work in Background",
-						subtitle = "Trigger assistant even when app is minimized (during playback)",
+						subtitle = "Trigger the assistant while FukeX is minimized",
 						icon = FxIcons.SettingsVoice,
 						checked = isVoiceAssistantBackgroundEnabled,
 						onCheckedChange = { 
@@ -285,6 +299,86 @@ fun SettingsScreen(
 							isVoiceAssistantBackgroundEnabled = it 
 						}
 					)
+					if (isVoiceAssistantBackgroundEnabled) {
+						val shortcutState = if (isVolumeKeyServiceOn) "On" else "Off"
+						ListItem(
+							headlineContent = { Text("Volume Key Shortcut: $shortcutState") },
+							supportingContent = {
+								Text(
+									if (isVolumeKeyServiceOn) "Hold Volume Down works while FukeX is minimized."
+									else "Android only lets apps see Volume Down in the background through an accessibility service. Tap, then turn on \"FukeX voice assistant shortcut\"."
+								)
+							},
+							leadingContent = { Icon(FxIcons.VolumeUp, null) },
+							modifier = Modifier
+								.clickable {
+									try {
+										context.startActivity(
+											android.content.Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)
+												.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+										)
+									} catch (e: Exception) {
+										android.widget.Toast.makeText(context, "Couldn't open accessibility settings", android.widget.Toast.LENGTH_SHORT).show()
+									}
+								}
+								.semantics {
+									role = Role.Button
+									stateDescription = shortcutState
+								}
+						)
+					}
+					SettingsToggleItem(
+						title = "Shake to Wake Assistant",
+						subtitle = if (isVoiceAssistantBackgroundEnabled) "Also shake your phone twice to talk to the assistant, in the app or in the background while something is playing"
+							else "Also shake your phone twice to talk to the assistant",
+						icon = FxIcons.Mic,
+						checked = isShakeEnabled,
+						onCheckedChange = {
+							SettingsManager.setVoiceShakeEnabled(context, it)
+							isShakeEnabled = it
+						}
+					)
+					if (isShakeEnabled) {
+						val sensitivityLabel = SettingsManager.shakeSensitivityLabel(shakeSensitivity)
+						fun setSensitivity(level: Int) {
+							val clamped = level.coerceIn(SettingsManager.MIN_SHAKE_SENSITIVITY, SettingsManager.MAX_SHAKE_SENSITIVITY)
+							shakeSensitivity = clamped
+							SettingsManager.setVoiceShakeSensitivity(context, clamped)
+						}
+						Column(
+							modifier = Modifier
+								.fillMaxWidth()
+								.padding(horizontal = 16.dp, vertical = 8.dp)
+								.clearAndSetSemantics {
+									contentDescription = "Shake Sensitivity"
+									setProgress { targetValue ->
+										setSensitivity(kotlin.math.round(targetValue).toInt())
+										true
+									}
+									progressBarRangeInfo = ProgressBarRangeInfo(
+										current = shakeSensitivity.toFloat(),
+										range = SettingsManager.MIN_SHAKE_SENSITIVITY.toFloat()..SettingsManager.MAX_SHAKE_SENSITIVITY.toFloat(),
+										steps = SettingsManager.MAX_SHAKE_SENSITIVITY - SettingsManager.MIN_SHAKE_SENSITIVITY - 1
+									)
+									stateDescription = sensitivityLabel
+								}
+						) {
+							Row(verticalAlignment = Alignment.CenterVertically) {
+								Icon(FxIcons.GraphicEq, null, modifier = Modifier.padding(end = 16.dp))
+								Column {
+									Text("Shake Sensitivity: $sensitivityLabel", style = MaterialTheme.typography.bodyLarge)
+									Text("Higher reacts to lighter shakes. Lower it if the assistant starts by accident.", style = MaterialTheme.typography.bodyMedium)
+								}
+							}
+							Slider(
+								value = shakeSensitivity.toFloat(),
+								onValueChange = { setSensitivity(kotlin.math.round(it).toInt()) },
+								valueRange = SettingsManager.MIN_SHAKE_SENSITIVITY.toFloat()..SettingsManager.MAX_SHAKE_SENSITIVITY.toFloat(),
+								steps = SettingsManager.MAX_SHAKE_SENSITIVITY - SettingsManager.MIN_SHAKE_SENSITIVITY - 1,
+								modifier = Modifier.fillMaxWidth().clearAndSetSemantics {}
+							)
+						}
+					}
 					ListItem(
 						headlineContent = { Text("Assistant Voice") },
 						supportingContent = { Text(currentEngineLabel) },

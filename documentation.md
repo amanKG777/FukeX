@@ -30,7 +30,7 @@ We offer many features that other media players lack. Some of our favorites incl
 
 * Synced lyrics: Read along on the lyrics screen, or have TalkBack read each line as it is sung.
 
-* Voice assistant: Shake your phone twice and tell FukeX what to play.
+* Voice assistant: Press and hold Volume Down and tell FukeX what to play.
 
 * Experimental YouTube support: Search YouTube and play a result.
 
@@ -96,7 +96,7 @@ The first time you open FukeX, it will ask for a few things. Here is what each o
 
 * Install unknown apps: Only asked for when you update FukeX from inside the app, and only the first time. See the updating section.
 
-* Vibration: A short buzz tells you the voice assistant heard your shake.
+* Vibration: A short buzz tells you the voice assistant is starting to listen.
 
 ## Creating your first playlist
 
@@ -354,11 +354,11 @@ The voice assistant lets you control FukeX without touching the screen.
 
 To turn it on, open settings, find Voice Assistant, and switch on "Enable Voice Assistant". Allow the microphone permission if you haven't yet. Then:
 
-1. Shake your phone twice. You will feel a short buzz and hear "Listening".
+1. Press and hold Volume Down for about half a second. You will feel a short buzz and hear "Listening". A quick press still just lowers the volume. If you switched on "Shake to Wake Assistant", shaking your phone twice works too.
 2. Wait for the beep, then say a command.
 3. FukeX tells you what it is doing, or what it did not understand.
 
-While you talk, the music is turned down so it does not drown you out. Switch on "Work in Background" to use the assistant while FukeX is minimized and something is playing.
+While you talk, the music is turned down so it does not drown you out. Switch on "Work in Background" to use the assistant while FukeX is minimized. For holding Volume Down to work in the background, also turn on "FukeX voice assistant shortcut" in your phone's accessibility settings (the "Volume Key Shortcut" item in FukeX settings takes you there). Android does not let apps see the volume keys in the background any other way. The shortcut only watches the Volume Down key and does not read your screen.
 
 Speech recognition is done by your phone's own speech service, which may need an internet connection depending on your device. If the assistant says it is not available, check that a speech recognition app, like Google, is installed and up to date.
 
@@ -518,9 +518,15 @@ In the settings screen, you'll see the following options, grouped under headings
 
 ### Voice Assistant
 
-* Enable Voice Assistant: Lets you shake your phone twice to give a voice command.
+* Enable Voice Assistant: Lets you press and hold Volume Down to give a voice command. A short press still lowers the volume.
 
-* Work in Background: Also listens for the shake while FukeX is minimized and something is playing. This only watches the motion sensor, the microphone stays off until you shake.
+* Work in Background: Lets you start the assistant while FukeX is minimized. Holding Volume Down in the background needs the "Volume Key Shortcut" (an accessibility service) to be turned on; tap that item to open the accessibility settings. If shake is on, shaking also works in the background while something is playing. The microphone stays off until you trigger the assistant.
+
+* Volume Key Shortcut: Shows whether the FukeX accessibility shortcut is on, and opens your phone's accessibility settings so you can turn it on or off.
+
+* Shake to Wake Assistant: Off by default. Also lets you shake your phone twice to start the assistant.
+
+* Shake Sensitivity: How hard you need to shake, from Very low (a firm shake) to Very high (a light shake). Lower it if the assistant starts by accident when you walk or run.
 
 * Assistant Voice: Choose which installed Text-to-Speech (TTS) engine on your device speaks the voice assistant responses.
 
@@ -572,7 +578,9 @@ FukeX never sends any of this anywhere. The only things that leave your phone ar
 
 * Playback pauses on its own. Check whether something else grabbed the audio, like a call or another player. This is deliberate, and FukeX resumes by itself after a call.
 
-* The voice assistant does not respond to a shake. Check that "Enable Voice Assistant" is on and that the microphone permission was granted. Give the phone two firm shakes within a couple of seconds. Outside the app, "Work in Background" must be on and something must be playing.
+* The voice assistant does not start. Check that "Enable Voice Assistant" is on and that the microphone permission was granted. Hold Volume Down for at least half a second. Outside the app, "Work in Background" and the "Volume Key Shortcut" must both be on.
+
+* The voice assistant does not respond to a shake. Check that "Shake to Wake Assistant" is on, give the phone two firm shakes within a couple of seconds, or raise "Shake Sensitivity". Outside the app, "Work in Background" must be on and something must be playing.
 
 * The voice assistant plays the wrong song. Say the full title, or add the artist's name. It plays the first match, looking through playlists first and then the music library.
 

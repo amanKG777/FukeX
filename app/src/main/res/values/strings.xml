@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">FukeX</string>
+    <string name="volume_key_service_label">FukeX voice assistant shortcut</string>
+    <string name="volume_key_service_description">Lets you hold Volume Down to talk to the FukeX voice assistant while FukeX is minimized. It only watches the Volume Down key, and only when "Work in Background" is on in FukeX settings. A short press still lowers the volume. FukeX does not read your screen.</string>
 </resources>

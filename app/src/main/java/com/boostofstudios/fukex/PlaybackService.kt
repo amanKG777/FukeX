@@ -59,36 +59,34 @@ class PlaybackService : MediaBrowserServiceCompat() {
     private var isForeground = false
 
     private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        if (key == "voice_assistant_background") {
-            updateShakeDetector()
+        when (key) {
+            "voice_assistant_enabled", "voice_assistant_background",
+            SettingsManager.KEY_VOICE_SHAKE_ENABLED, SettingsManager.KEY_VOICE_SHAKE_SENSITIVITY -> updateShakeDetector()
         }
     }
 
+    // Shaking is optional; hold-Volume-Down in the background is handled by VolumeKeyAccessibilityService
     private fun updateShakeDetector() {
-        if (SettingsManager.isVoiceAssistantBackgroundEnabled(this)) {
-            if (sensorManager == null) {
-                sensorManager = getSystemService(Context.SENSOR_SERVICE) as? android.hardware.SensorManager
-                shakeDetector = ShakeDetector {
-                    val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        vibrator.vibrate(android.os.VibrationEffect.createOneShot(200, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
-                    } else {
-                        @Suppress("DEPRECATION")
-                        vibrator.vibrate(200)
-                    }
-                    playFeedbackBeep()
-                    sendBroadcast(Intent(ACTION_VOICE_ASSISTANT).apply { setPackage(packageName) })
-                }
-            }
-            val accelerometer = sensorManager?.getDefaultSensor(android.hardware.Sensor.TYPE_ACCELEROMETER)
-            accelerometer?.let {
-                // Unregister first so repeated calls don't stack listeners
-                shakeDetector?.let { d -> sensorManager?.unregisterListener(d) }
-                sensorManager?.registerListener(shakeDetector, it, android.hardware.SensorManager.SENSOR_DELAY_GAME)
-            }
-        } else {
+        val wanted = SettingsManager.isVoiceAssistantEnabled(this) &&
+            SettingsManager.isVoiceAssistantBackgroundEnabled(this) &&
+            SettingsManager.isVoiceShakeEnabled(this)
+        if (!wanted) {
             shakeDetector?.let { sensorManager?.unregisterListener(it) }
+            return
         }
+        val threshold = SettingsManager.shakeThresholdFor(SettingsManager.getVoiceShakeSensitivity(this))
+        if (sensorManager == null) {
+            sensorManager = getSystemService(Context.SENSOR_SERVICE) as? android.hardware.SensorManager
+        }
+        val detector = shakeDetector ?: ShakeDetector(threshold) {
+            // MainActivity's assistant gives the buzz/beep feedback once it starts listening
+            VoiceAssistantTrigger.request(this)
+        }.also { shakeDetector = it }
+        detector.thresholdG = threshold
+        val accelerometer = sensorManager?.getDefaultSensor(android.hardware.Sensor.TYPE_ACCELEROMETER) ?: return
+        // Unregister first so repeated calls don't stack listeners
+        sensorManager?.unregisterListener(detector)
+        sensorManager?.registerListener(detector, accelerometer, android.hardware.SensorManager.SENSOR_DELAY_GAME)
     }
 
     override fun onCreate() {
