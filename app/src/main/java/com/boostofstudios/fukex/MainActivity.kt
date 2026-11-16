@@ -57,6 +57,8 @@ class MainActivity : FragmentActivity() {
 			}
 			val accelerometer = sensorManager?.getDefaultSensor(android.hardware.Sensor.TYPE_ACCELEROMETER)
 			accelerometer?.let {
+				// onCreate and onResume both get here; don't stack duplicate listeners
+				shakeDetector?.let { d -> sensorManager?.unregisterListener(d) }
 				sensorManager?.registerListener(shakeDetector, it, android.hardware.SensorManager.SENSOR_DELAY_GAME)
 			}
 		} else {

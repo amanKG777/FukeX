@@ -67,7 +67,7 @@ class PlaybackService : MediaBrowserServiceCompat() {
     private fun updateShakeDetector() {
         if (SettingsManager.isVoiceAssistantBackgroundEnabled(this)) {
             if (sensorManager == null) {
-                sensorManager = getSystemService(Context.SENSOR_SERVICE) as android.hardware.SensorManager
+                sensorManager = getSystemService(Context.SENSOR_SERVICE) as? android.hardware.SensorManager
                 shakeDetector = ShakeDetector {
                     val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -82,6 +82,8 @@ class PlaybackService : MediaBrowserServiceCompat() {
             }
             val accelerometer = sensorManager?.getDefaultSensor(android.hardware.Sensor.TYPE_ACCELEROMETER)
             accelerometer?.let {
+                // Unregister first so repeated calls don't stack listeners
+                shakeDetector?.let { d -> sensorManager?.unregisterListener(d) }
                 sensorManager?.registerListener(shakeDetector, it, android.hardware.SensorManager.SENSOR_DELAY_GAME)
             }
         } else {
