@@ -169,8 +169,8 @@ queue, without touching your playlist.</p></li>
 for your speaker, wired headphones, Bluetooth and USB audio.</p></li>
 <li><p>Synced lyrics: Read along on the lyrics screen, or have TalkBack
 read each line as it is sung.</p></li>
-<li><p>Voice assistant: Shake your phone twice and tell FukeX what to
-play.</p></li>
+<li><p>Voice assistant: Press and hold Volume Down and tell FukeX what
+to play.</p></li>
 <li><p>Experimental YouTube support: Search YouTube and play a
 result.</p></li>
 <li><p>Android Auto: Browse and play your playlists from the car
@@ -182,9 +182,10 @@ screen, menu and dialog, downloaded only if you want it.</p></li>
 <p>FukeX plays these file types, both from your device and from an SMB
 share:</p>
 <p>mp3, mp4, m4a, aac, flac, wav, ogg, opus, alac, mkv, and webm.</p>
-<p>Video files are treated as audio only. If a file plays in FukeX but
-you selected it from a folder full of other stuff, don&#39;t worry, the file
-picker already hides everything that isn&#39;t playable.</p>
+<p>Video files are treated as audio only. In the file picker, playable
+media files are marked with an audio icon, while other files show a
+generic file icon and do nothing if tapped. When you use &quot;Add entire
+folder&quot;, only playable media files are added.</p>
 <p>You need Android 8.0 or newer to run FukeX.</p>
 <h2 id="how-to-get-it">How to get it?</h2>
 <p>You can download FukeX to your device from our website:</p>
@@ -261,8 +262,8 @@ does not phone home, and there are no ads or trackers.</p></li>
 <li><p>Install unknown apps: Only asked for when you update FukeX from
 inside the app, and only the first time. See the updating
 section.</p></li>
-<li><p>Vibration: A short buzz tells you the voice assistant heard your
-shake.</p></li>
+<li><p>Vibration: A short buzz tells you the voice assistant is starting
+to listen.</p></li>
 </ul>
 <h2 id="creating-your-first-playlist">Creating your first playlist</h2>
 <p>Wanna start listening to your favorite songs? Follow these steps:</p>
@@ -272,16 +273,18 @@ media, in the air?</p></li>
 <li><p>You will see the following options:</p></li>
 </ol>
 <ul>
-<li><p>Settings: This is used to go to the settings page.</p></li>
+<li><p>Music Library: Opens the built-in music library to browse songs
+on your device.</p></li>
 <li><p>Import playlist: Loads a playlist you previously
 exported.</p></li>
+<li><p>Settings: This is used to go to the settings page.</p></li>
 <li><p>Default playlist tab, selected: This is a default playlist, which
 is currently empty. You can create a new playlist, or add media to play
 directly here.</p></li>
 <li><p>Seekbar / now playing indicator bars.</p></li>
 <li><p>Music controls: Like play/pause, previous, next, more options,
-and finally, the button which will be useful here, &quot;Add media to
-playlist&quot;.</p></li>
+and finally, the floating button at the bottom right which will be
+useful here, &quot;Add media to playlist&quot;.</p></li>
 </ul>
 <p>Right here, we&#39;ll be adding a folder or song to the default playlist.
 Start by selecting the &quot;Add media to playlist&quot; button. It will present
@@ -289,11 +292,15 @@ you with a dialog titled &quot;Add Media&quot;, asking &quot;Where would you lik
 add media from?&quot;</p>
 <p>You&#39;ll see the following options:</p>
 <ul>
-<li><p>Local device: Choose this option if the audio file you wanna play
-is in your device&#39;s storage. For now, we&#39;ll choose this option.</p></li>
-<li><p>SMB share: You can play songs from your home servers or your PC.
+<li><p>Music Library: Browse songs already indexed on your phone by
+song, artist, album or genre.</p></li>
+<li><p>Local Device: Choose this option if you want to browse your
+device&#39;s folders directly. For now, we&#39;ll choose this option.</p></li>
+<li><p>SMB Share: You can play songs from your home servers or your PC.
 Keep reading the documentation or jump to the heading if you wanna learn
 how to connect it.</p></li>
+<li><p>YouTube Search: Search YouTube and add a result to your playlist
+(experimental).</p></li>
 </ul>
 <p>Finally, when choosing &quot;Local device&quot;, it will display a custom file
 picker where TalkBack accessibility gestures will work. Browse for the
@@ -313,10 +320,9 @@ level and the picker closes.</p></li>
 <li><p>Media is always added to the playlist tab you currently have
 open, and it goes to the end of the list.</p></li>
 </ul>
-<p>As soon as you add the folder, your first song in the folder will
-start playing. You can pause it by clicking the pause button. Sure, I
-don&#39;t hope you are that dumb, anyway, now let&#39;s explore the rest of the
-player.</p>
+<p>As soon as you add the folder, its playable tracks appear in your
+playlist. Tap any track in the list or press the Play button to start
+listening. Now let&#39;s explore the rest of the player.</p>
 <h2 id="around-the-player-screen">Around the player screen</h2>
 <p>Once a playlist has media in it, the screen is split into two
 parts.</p>
@@ -332,17 +338,22 @@ move within the song. It reads out as &quot;3:12 of 4:05&quot;.</p></li>
 <li><p>Previous and Next buttons: These are dimmed at the very start and
 the very end of a playlist, so you always know where you are.</p></li>
 <li><p>Play / Pause button.</p></li>
-<li><p>More options: Search, playlist info, amplifier toggle, playback
-effects, and the hide and remove actions for this playlist.</p></li>
+<li><p>More options: Search within playlist, Playlist info, Up next,
+Lyrics, Equalizer, amplifier toggle, Playback Effects, and the hide and
+remove actions for this playlist.</p></li>
 </ul>
 <p>FukeX saves your position roughly every five seconds and again
 whenever you leave a playlist. Come back later and it picks up the same
 track, at the same second.</p>
-<h2 id="reordering-and-removing-tracks">Reordering and removing
-tracks</h2>
+<h2 id="reordering-queuing-and-removing-tracks">Reordering, queuing, and
+removing tracks</h2>
 <p>Keep focus on any track in the list and swipe up or down with one
-finger to reveal its TalkBack actions:</p>
+finger (or tap its Track options button) to reveal its actions:</p>
 <ul>
+<li><p>Play next: Plays the track right after the one currently playing,
+without changing your playlist.</p></li>
+<li><p>Add to queue: Adds the track to the end of the Up Next
+queue.</p></li>
 <li><p>Move Up: Swaps the track with the one above it.</p></li>
 <li><p>Move Down: Swaps it with the one below.</p></li>
 <li><p>Remove: Takes the track out of the playlist. This never deletes
@@ -383,7 +394,7 @@ storage.</p>
 <p>Keep your focus on the default playlist tab, and using the TalkBack
 action, find the &quot;Create new playlist&quot; button. As soon as you activate
 it, a text box will pop up, asking you for the name of the playlist. You
-can name it anything. After providing a name, just press &quot;OK&quot;. When
+can name it anything. After providing a name, press &quot;Create&quot;. When
 you&#39;re done with the creation of the playlist, make sure to add a media
 file! ROFL.</p>
 <p>The new playlist becomes the selected tab right away, so the very
@@ -495,7 +506,9 @@ PC, your NAS, or a home server, and FukeX streams it.</p>
 <ul>
 <li><p>SMB URL: Something like smb://192.168.1.100/Music/. The smb://
 part is already filled in for you.</p></li>
-<li><p>Username: Leave it empty for a guest or public share.</p></li>
+<li><p>Username: Leave it empty for a guest or public share. If your
+server requires a domain, enter it as
+<code>DOMAIN;username</code>.</p></li>
 <li><p>Password: Same, leave it empty if the share doesn&#39;t need
 one.</p></li>
 </ul>
@@ -540,9 +553,10 @@ to queue&quot; in its options. &quot;Play next&quot; puts the track right after 
 that is playing, and &quot;Add to queue&quot; puts it after everything you already
 queued.</p>
 <p>Queued tracks are never copied into your playlist, and they do not
-move the saved position of the playlist. Open &quot;Up Next&quot; from the player
-to see what is coming. It marks the track that is playing as &quot;Now
-playing&quot; and your additions as &quot;Queued&quot;, and you can take a queued track
+move the saved position of the playlist. Open &quot;Up next&quot; from the
+player&#39;s More options menu to see what is coming. It marks the track
+that is playing as &quot;Now playing&quot; and your additions as &quot;Queued&quot;. You can
+tap any track in Up Next to jump straight to it, or take a queued track
 out with &quot;Remove from queue&quot;.</p>
 <h2 id="the-equalizer">The equalizer</h2>
 <p>Open the 3-dots menu in the playback bar and choose &quot;Equalizer&quot;.</p>
@@ -595,17 +609,26 @@ screen.</p>
 &quot;Enable Voice Assistant&quot;. Allow the microphone permission if you haven&#39;t
 yet. Then:</p>
 <ol type="1">
-<li>Shake your phone twice. You will feel a short buzz and hear
-&quot;Listening&quot;.</li>
+<li>Press and hold Volume Down for about half a second. You will feel a
+short buzz and hear &quot;Listening&quot;. A quick press still just lowers the
+volume. If you switched on &quot;Shake to Wake Assistant&quot;, shaking your phone
+twice works too.</li>
 <li>Wait for the beep, then say a command.</li>
 <li>FukeX tells you what it is doing, or what it did not
 understand.</li>
 </ol>
 <p>While you talk, the music is turned down so it does not drown you
-out. Switch on &quot;Work in Background&quot; to use the assistant while FukeX is
-minimized and something is playing.</p>
-<p>Speech recognition is done by your phone&#39;s own speech service, which
-may need an internet connection depending on your device. If the
+out. Holding Volume Down is ignored during phone or VoIP calls so it
+never gets in the way of call volume. Switch on &quot;Work in Background&quot; to
+use the assistant while FukeX is minimized. For holding Volume Down to
+work in the background, also turn on &quot;FukeX voice assistant shortcut&quot; in
+your phone&#39;s accessibility settings (the &quot;Volume Key Shortcut&quot; item in
+FukeX settings takes you there). Android does not let apps see the
+volume keys in the background any other way. The shortcut only watches
+the Volume Down key and does not read your screen.</p>
+<p>Speech recognition uses on-device recognition on Android 13 and newer
+when available, and otherwise falls back to your phone&#39;s speech service,
+which may need an internet connection depending on your device. If the
 assistant says it is not available, check that a speech recognition app,
 like Google, is installed and up to date.</p>
 <p>What you can say:</p>
@@ -614,18 +637,27 @@ like Google, is installed and up to date.</p>
 looks in your playlists first, then in your music library, and only then
 on YouTube. If you name an artist or an album, it plays that whole
 artist or album.</p></li>
+<li><p>Switch results or versions: If multiple versions of a song exist
+in a playlist, or when searching on YouTube, say &quot;Next result&quot;, &quot;Another
+version&quot;, &quot;Different one&quot;, &quot;Dusra bajao&quot;, or &quot;Previous result&quot; / &quot;Last
+result&quot; / &quot;Pichla result&quot; to step through them without searching again.
+You can also jump directly by number or ordinal (1 to 20), such as
+&quot;Option 2&quot;, &quot;Result 3&quot;, or &quot;Play second result&quot;.</p></li>
 <li><p>Play it later: &quot;Play Believer next&quot; or &quot;Add Believer to
 queue&quot;.</p></li>
 <li><p>Control playback: &quot;Pause&quot;, &quot;Stop&quot;, &quot;Resume&quot;, &quot;Play&quot;, &quot;Next&quot;,
-&quot;Previous&quot;, and &quot;Start over&quot; to restart the current track.</p></li>
+&quot;Previous&quot;, and &quot;Start over&quot; to restart the current track. When you are
+at the end or beginning of a queue with an active voice search, &quot;Next&quot;
+and &quot;Previous&quot; also step to the next or previous search result.</p></li>
 <li><p>Seek: &quot;Forward&quot;, &quot;Rewind&quot;, &quot;Forward 30 seconds&quot;, &quot;Go back 1
 minute&quot;. With no number, it moves 10 seconds.</p></li>
 <li><p>Volume: &quot;Volume up&quot;, &quot;Volume down&quot;, &quot;Louder&quot;, &quot;Quieter&quot;. This
 changes your phone&#39;s media volume.</p></li>
 <li><p>Ask what is playing: &quot;What&#39;s playing&quot; or &quot;What song is
 this&quot;.</p></li>
-<li><p>Amplifier: &quot;Amplifier on&quot;, &quot;Amplifier off&quot;, &quot;Amplifier increase&quot;,
-&quot;Amplifier decrease&quot;.</p></li>
+<li><p>Amplifier: &quot;Amplifier on&quot;, &quot;Amplifier off&quot;, &quot;Amplifier increase&quot;
+(capped at 15 dB by voice for safety; higher levels up to 25 dB can be
+set in Settings), &quot;Amplifier decrease&quot;.</p></li>
 <li><p>Help: &quot;What can I say&quot; lists the commands out loud, and &quot;Open
 documentation&quot; brings up this page.</p></li>
 </ul>
@@ -820,11 +852,29 @@ described in the visual icons section above.</li>
 </ul>
 <h3 id="voice-assistant">Voice Assistant</h3>
 <ul>
-<li><p>Enable Voice Assistant: Lets you shake your phone twice to give a
-voice command.</p></li>
-<li><p>Work in Background: Also listens for the shake while FukeX is
-minimized and something is playing. This only watches the motion sensor,
-the microphone stays off until you shake.</p></li>
+<li><p>Enable Voice Assistant: Lets you press and hold Volume Down to
+give a voice command. A short press still lowers the volume.</p></li>
+<li><p>Work in Background: Lets you start the assistant while FukeX is
+minimized. Holding Volume Down in the background needs the &quot;Volume Key
+Shortcut&quot; (an accessibility service) to be turned on; tap that item to
+open the accessibility settings. If shake is on, shaking also works in
+the background while something is playing. The microphone stays off
+until you trigger the assistant.</p></li>
+<li><p>Volume Key Shortcut: Shows whether the FukeX accessibility
+shortcut is on, and opens your phone&#39;s accessibility settings so you can
+turn it on or off.</p></li>
+<li><p>Shake to Wake Assistant: Off by default. Also lets you shake your
+phone twice to start the assistant.</p></li>
+<li><p>Shake Sensitivity: How hard you need to shake, from Very low (a
+firm shake) to Very high (a light shake). Lower it if the assistant
+starts by accident when you walk or run.</p></li>
+<li><p>Assistant Voice: Choose which installed Text-to-Speech (TTS)
+engine on your device speaks the voice assistant responses.</p></li>
+<li><p>Customize Spoken Feedback: Tick boxes to control what events the
+assistant speaks for (listening, searching, playing, switching results,
+controls, or errors and unrecognised speech). When an event is turned
+off, the assistant plays a short feedback beep instead of
+speaking.</p></li>
 </ul>
 <h3 id="fading-gapless-playback">Fading (Gapless Playback)</h3>
 <ul>
@@ -888,11 +938,14 @@ permanently.</p></li>
 <li><p>Playback pauses on its own. Check whether something else grabbed
 the audio, like a call or another player. This is deliberate, and FukeX
 resumes by itself after a call.</p></li>
+<li><p>The voice assistant does not start. Check that &quot;Enable Voice
+Assistant&quot; is on and that the microphone permission was granted. Hold
+Volume Down for at least half a second. Outside the app, &quot;Work in
+Background&quot; and the &quot;Volume Key Shortcut&quot; must both be on.</p></li>
 <li><p>The voice assistant does not respond to a shake. Check that
-&quot;Enable Voice Assistant&quot; is on and that the microphone permission was
-granted. Give the phone two firm shakes within a couple of seconds.
-Outside the app, &quot;Work in Background&quot; must be on and something must be
-playing.</p></li>
+&quot;Shake to Wake Assistant&quot; is on, give the phone two firm shakes within a
+couple of seconds, or raise &quot;Shake Sensitivity&quot;. Outside the app, &quot;Work
+in Background&quot; must be on and something must be playing.</p></li>
 <li><p>The voice assistant plays the wrong song. Say the full title, or
 add the artist&#39;s name. It plays the first match, looking through
 playlists first and then the music library.</p></li>
@@ -918,10 +971,11 @@ reference</h2>
 and swiping up or down with one finger.</p>
 <p>On a playlist tab: Create new playlist, Move Left, Move Right, Hide
 or Unlock, Export, Remove.</p>
-<p>On a track in the list: Move Up, Move Down, Remove.</p>
-<p>On the More options button: Search within playlist, Playlist info,
-Enable or Disable Amplifier, Playback Effects, Hide or Unlock,
+<p>On a track in the list: Play next, Add to queue, Move Up, Move Down,
 Remove.</p>
+<p>On the More options button: Search within playlist, Playlist info, Up
+next, Lyrics, Equalizer, Enable or Disable Amplifier, Playback Effects,
+Hide or Unlock, Remove.</p>
 <p>On a song in the music library: Play next, Add to queue, Add to
 playlist.</p>
 <p>On a queued track in Up Next: Remove from queue.</p>

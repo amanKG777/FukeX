@@ -1,6 +1,6 @@
 # FukeX
 
-FukeX is a lightweight, open source Android media player written in Kotlin, built from the ground up with screen reader accessibility in mind. It's fully navigable with TalkBack, and pairs a simple UI with features other players leave out — crossfading, gapless playback, SMB streaming, playlist locking, a 10-band equalizer, synced lyrics, a shake-to-talk voice assistant, and more.
+FukeX is a lightweight, open source Android media player written in Kotlin, built from the ground up with screen reader accessibility in mind. It's fully navigable with TalkBack, and pairs a simple UI with features other players leave out — crossfading, gapless playback, SMB streaming, playlist locking, a 10-band equalizer, synced lyrics, a voice assistant, and more.
 
 Full user documentation, covering every feature and how to use it, is available in [documentation.md](documentation.md).
 
@@ -16,7 +16,7 @@ Grab the latest signed APK from the [Releases](../../releases/latest) page, or f
 * SMB share streaming, and experimental YouTube search and playback
 * 10-band equalizer with per-output settings (speaker, wired, Bluetooth, USB), amplifier, ReplayGain, speed and pitch
 * Synced lyrics from `.lrc` files or lrclib.net
-* Voice assistant: shake twice, then say things like "play <song>", "add <song> to queue", "forward 30 seconds", "what's playing"
+* Voice assistant: press and hold Volume Down (or optionally shake twice), then say things like "play <song>", "add <song> to queue", "forward 30 seconds", "what's playing"
 * Optional visual icon pack, downloaded on request from `iconpacks/` on GitHub (see [iconpacks/README.md](iconpacks/README.md))
 * In-app updates: checks GitHub releases with semantic version comparison, downloads the signed APK, verifies it (checksum, package, version and signing key) and hands it to the system installer
 * Background playback engine with media notification, lock screen, Bluetooth and Android Auto controls

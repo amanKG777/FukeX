@@ -44,7 +44,7 @@ FukeX plays these file types, both from your device and from an SMB share:
 
 mp3, mp4, m4a, aac, flac, wav, ogg, opus, alac, mkv, and webm.
 
-Video files are treated as audio only. If a file plays in FukeX but you selected it from a folder full of other stuff, don't worry, the file picker already hides everything that isn't playable.
+Video files are treated as audio only. In the file picker, playable media files are marked with an audio icon, while other files show a generic file icon and do nothing if tapped. When you use "Add entire folder", only playable media files are added.
 
 You need Android 8.0 or newer to run FukeX.
 
@@ -106,23 +106,29 @@ Wanna start listening to your favorite songs? Follow these steps:
 
 2. You will see the following options:
 
-* Settings: This is used to go to the settings page.
+* Music Library: Opens the built-in music library to browse songs on your device.
 
 * Import playlist: Loads a playlist you previously exported.
+
+* Settings: This is used to go to the settings page.
 
 * Default playlist tab, selected: This is a default playlist, which is currently empty. You can create a new playlist, or add media to play directly here.
 
 * Seekbar / now playing indicator bars.
 
-* Music controls: Like play/pause, previous, next, more options, and finally, the button which will be useful here, "Add media to playlist".
+* Music controls: Like play/pause, previous, next, more options, and finally, the floating button at the bottom right which will be useful here, "Add media to playlist".
 
 Right here, we'll be adding a folder or song to the default playlist. Start by selecting the "Add media to playlist" button. It will present you with a dialog titled "Add Media", asking "Where would you like to add media from?"
 
 You'll see the following options:
 
-* Local device: Choose this option if the audio file you wanna play is in your device's storage. For now, we'll choose this option.
+* Music Library: Browse songs already indexed on your phone by song, artist, album or genre.
 
-* SMB share: You can play songs from your home servers or your PC. Keep reading the documentation or jump to the heading if you wanna learn how to connect it.
+* Local Device: Choose this option if you want to browse your device's folders directly. For now, we'll choose this option.
+
+* SMB Share: You can play songs from your home servers or your PC. Keep reading the documentation or jump to the heading if you wanna learn how to connect it.
+
+* YouTube Search: Search YouTube and add a result to your playlist (experimental).
 
 Finally, when choosing "Local device", it will display a custom file picker where TalkBack accessibility gestures will work. Browse for the file you want to play, or if you want to select an entire folder, keep focus on the folder you want to add, and swipe with one finger to reveal the TalkBack action saying "Add entire folder". As soon as you choose this, your playlist will be saved in a JSON file just in case, and your data stays only on your device.
 
@@ -136,7 +142,7 @@ A couple of things worth knowing about the file picker:
 
 * Media is always added to the playlist tab you currently have open, and it goes to the end of the list.
 
-As soon as you add the folder, your first song in the folder will start playing. You can pause it by clicking the pause button. Sure, I don't hope you are that dumb, anyway, now let's explore the rest of the player.
+As soon as you add the folder, its playable tracks appear in your playlist. Tap any track in the list or press the Play button to start listening. Now let's explore the rest of the player.
 
 ## Around the player screen
 
@@ -154,13 +160,17 @@ The bottom part is the playback bar, and it holds:
 
 * Play / Pause button.
 
-* More options: Search, playlist info, amplifier toggle, playback effects, and the hide and remove actions for this playlist.
+* More options: Search within playlist, Playlist info, Up next, Lyrics, Equalizer, amplifier toggle, Playback Effects, and the hide and remove actions for this playlist.
 
 FukeX saves your position roughly every five seconds and again whenever you leave a playlist. Come back later and it picks up the same track, at the same second.
 
-## Reordering and removing tracks
+## Reordering, queuing, and removing tracks
 
-Keep focus on any track in the list and swipe up or down with one finger to reveal its TalkBack actions:
+Keep focus on any track in the list and swipe up or down with one finger (or tap its Track options button) to reveal its actions:
+
+* Play next: Plays the track right after the one currently playing, without changing your playlist.
+
+* Add to queue: Adds the track to the end of the Up Next queue.
 
 * Move Up: Swaps the track with the one above it.
 
@@ -196,7 +206,7 @@ Handy when you want to know whether that podcast dump is eating your storage.
 
 Oh, so let's jump into creating your own playlists.
 
-Keep your focus on the default playlist tab, and using the TalkBack action, find the "Create new playlist" button. As soon as you activate it, a text box will pop up, asking you for the name of the playlist. You can name it anything. After providing a name, just press "OK". When you're done with the creation of the playlist, make sure to add a media file! ROFL.
+Keep your focus on the default playlist tab, and using the TalkBack action, find the "Create new playlist" button. As soon as you activate it, a text box will pop up, asking you for the name of the playlist. You can name it anything. After providing a name, press "Create". When you're done with the creation of the playlist, make sure to add a media file! ROFL.
 
 The new playlist becomes the selected tab right away, so the very next thing you add lands in it.
 
@@ -282,7 +292,7 @@ This is the feature we're proudest of. Your music can live on your PC, your NAS,
 
 * SMB URL: Something like smb://192.168.1.100/Music/. The smb:// part is already filled in for you.
 
-* Username: Leave it empty for a guest or public share.
+* Username: Leave it empty for a guest or public share. If your server requires a domain, enter it as `DOMAIN;username`.
 
 * Password: Same, leave it empty if the share doesn't need one.
 
@@ -312,7 +322,7 @@ On a single song, open "Song options" for Play next, Add to queue, and Add to pl
 
 Every track on a playlist or in the library has "Play next" and "Add to queue" in its options. "Play next" puts the track right after the one that is playing, and "Add to queue" puts it after everything you already queued.
 
-Queued tracks are never copied into your playlist, and they do not move the saved position of the playlist. Open "Up Next" from the player to see what is coming. It marks the track that is playing as "Now playing" and your additions as "Queued", and you can take a queued track out with "Remove from queue".
+Queued tracks are never copied into your playlist, and they do not move the saved position of the playlist. Open "Up next" from the player's More options menu to see what is coming. It marks the track that is playing as "Now playing" and your additions as "Queued". You can tap any track in Up Next to jump straight to it, or take a queued track out with "Remove from queue".
 
 ## The equalizer
 
@@ -358,19 +368,19 @@ To turn it on, open settings, find Voice Assistant, and switch on "Enable Voice 
 2. Wait for the beep, then say a command.
 3. FukeX tells you what it is doing, or what it did not understand.
 
-While you talk, the music is turned down so it does not drown you out. Switch on "Work in Background" to use the assistant while FukeX is minimized. For holding Volume Down to work in the background, also turn on "FukeX voice assistant shortcut" in your phone's accessibility settings (the "Volume Key Shortcut" item in FukeX settings takes you there). Android does not let apps see the volume keys in the background any other way. The shortcut only watches the Volume Down key and does not read your screen.
+While you talk, the music is turned down so it does not drown you out. Holding Volume Down is ignored during phone or VoIP calls so it never gets in the way of call volume. Switch on "Work in Background" to use the assistant while FukeX is minimized. For holding Volume Down to work in the background, also turn on "FukeX voice assistant shortcut" in your phone's accessibility settings (the "Volume Key Shortcut" item in FukeX settings takes you there). Android does not let apps see the volume keys in the background any other way. The shortcut only watches the Volume Down key and does not read your screen.
 
-Speech recognition is done by your phone's own speech service, which may need an internet connection depending on your device. If the assistant says it is not available, check that a speech recognition app, like Google, is installed and up to date.
+Speech recognition uses on-device recognition on Android 13 and newer when available, and otherwise falls back to your phone's speech service, which may need an internet connection depending on your device. If the assistant says it is not available, check that a speech recognition app, like Google, is installed and up to date.
 
 What you can say:
 
 * Play something: "Play Shape of You", or "Tum Hi Ho bajao". FukeX looks in your playlists first, then in your music library, and only then on YouTube. If you name an artist or an album, it plays that whole artist or album.
 
-* Switch results or versions: If multiple versions of a song exist in a playlist, or when searching on YouTube, say "Next result", "Another version", "Different one", "Dusra bajao", or "Option 2" to cycle through them without having to search again.
+* Switch results or versions: If multiple versions of a song exist in a playlist, or when searching on YouTube, say "Next result", "Another version", "Different one", "Dusra bajao", or "Previous result" / "Last result" / "Pichla result" to step through them without searching again. You can also jump directly by number or ordinal (1 to 20), such as "Option 2", "Result 3", or "Play second result".
 
 * Play it later: "Play Believer next" or "Add Believer to queue".
 
-* Control playback: "Pause", "Stop", "Resume", "Play", "Next", "Previous", and "Start over" to restart the current track.
+* Control playback: "Pause", "Stop", "Resume", "Play", "Next", "Previous", and "Start over" to restart the current track. When you are at the end or beginning of a queue with an active voice search, "Next" and "Previous" also step to the next or previous search result.
 
 * Seek: "Forward", "Rewind", "Forward 30 seconds", "Go back 1 minute". With no number, it moves 10 seconds.
 
@@ -378,7 +388,7 @@ What you can say:
 
 * Ask what is playing: "What's playing" or "What song is this".
 
-* Amplifier: "Amplifier on", "Amplifier off", "Amplifier increase", "Amplifier decrease".
+* Amplifier: "Amplifier on", "Amplifier off", "Amplifier increase" (capped at 15 dB by voice for safety; higher levels up to 25 dB can be set in Settings), "Amplifier decrease".
 
 * Help: "What can I say" lists the commands out loud, and "Open documentation" brings up this page.
 
@@ -530,7 +540,7 @@ In the settings screen, you'll see the following options, grouped under headings
 
 * Assistant Voice: Choose which installed Text-to-Speech (TTS) engine on your device speaks the voice assistant responses.
 
-* Customize Spoken Feedback: Tick boxes to control what events the assistant speaks for (listening, searching, playing, switching results, or controls). When an event is turned off, the assistant plays a short feedback beep instead of speaking.
+* Customize Spoken Feedback: Tick boxes to control what events the assistant speaks for (listening, searching, playing, switching results, controls, or errors and unrecognised speech). When an event is turned off, the assistant plays a short feedback beep instead of speaking.
 
 ### Fading (Gapless Playback)
 
@@ -600,9 +610,9 @@ Every action below is reachable by putting TalkBack focus on the item and swipin
 
 On a playlist tab: Create new playlist, Move Left, Move Right, Hide or Unlock, Export, Remove.
 
-On a track in the list: Move Up, Move Down, Remove.
+On a track in the list: Play next, Add to queue, Move Up, Move Down, Remove.
 
-On the More options button: Search within playlist, Playlist info, Enable or Disable Amplifier, Playback Effects, Hide or Unlock, Remove.
+On the More options button: Search within playlist, Playlist info, Up next, Lyrics, Equalizer, Enable or Disable Amplifier, Playback Effects, Hide or Unlock, Remove.
 
 On a song in the music library: Play next, Add to queue, Add to playlist.
 
